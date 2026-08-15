@@ -87,7 +87,7 @@ flowchart LR
           <thead><tr><th>Secret</th><th>Who</th><th>Lives</th></tr></thead>
           <tbody>
             <tr><td>Operator account</td><td>Humans</td><td>Argon2id in the manager SQLite. Create / rotate in Settings. <a href="18-operator-accounts.html">18</a>.</td></tr>
-            <tr><td>UI basic auth (optional)</td><td>Humans</td><td>nginx htpasswd on the monitor only. Extra gate, not the app password.</td></tr>
+            <tr><td>UI basic auth (optional)</td><td>Humans</td><td>nginx htpasswd. A <em>different</em> password from Settings users. Turn it off after operator accounts exist or you will get a browser popup that rejects those users.</td></tr>
             <tr><td>Ingest token</td><td>Manager + agents</td><td><code>/etc/gpewebdefender/token</code> and <code>/etc/gpewebdefender/env</code> (mode 640). Never grants user-admin.</td></tr>
           </tbody>
         </table>
