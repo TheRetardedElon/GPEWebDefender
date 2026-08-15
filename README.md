@@ -12,6 +12,46 @@ Full picture: [`dochub/index.html`](dochub/index.html) or `/docs/` on a running 
 
 ---
 
+## What it looks like
+
+Live dashboard from a real operator box. Your names and pins will be whatever you configure.
+
+### Live map
+
+A shot fires only when an alert happens — attacker country to the host that was hit — then it goes away. Hosts stay on the plate. The feed is the same events, numbered.
+
+![Live attack map: a beam from South-East Asia landing on a defended host](docs/shots/map.png)
+
+### Alert card
+
+Click a row. Country plate, attack-type mark, and the server that was hit, plus the usual fields (rule, MITRE, evidence). No standing tracks.
+
+![Alert inspect card with country art, Linux-auth mark, and host icon](docs/shots/card.png)
+
+### Insight
+
+Reports → **Insight**. Same alerts, broken down. 1h / 24h / 7d is a real clock. Click a bar or host card to Search. **CSV** / **JSON** / **Copy** export that window (session cookie, no ingest token in the file).
+
+![Insight: hourly volume, category mix, severity](docs/shots/reports-1.png)
+
+![Insight: MITRE techniques and per-host strip](docs/shots/reports-2.png)
+
+![Insight: host cards and origin countries](docs/shots/reports-3.png)
+
+![Insight: top rules and paths being hit](docs/shots/reports-4.png)
+
+![Insight: top attacker IPs with country marks](docs/shots/reports-5.png)
+
+### Search
+
+FTS5 on the manager. Keyword, IP, host, kind. Newest first (click **When** to flip). No Elasticsearch.
+
+![Search: Linux auth / sshd across hosts](docs/shots/search-1.png)
+
+![Search: keyword brute](docs/shots/search-2.png)
+
+---
+
 ## Pick a shape
 
 | You have | Install |
