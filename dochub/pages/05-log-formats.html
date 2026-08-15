@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>05 · Log formats — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>05 · Log formats</h1>
+        <p class="lead">
+          Parser lives in <code>internal/parse</code>. JSON first if the line starts with <code>{</code>,
+          then nginx/Apache combined, then vhost_combined, then syslog <code>auth.log</code>
+          (sshd / sudo / PAM only).
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">Prefer JSON</span>
+        </div>
+      </header>
+
+      <section class="block">
+        <h2>Combined (default nginx / Apache)</h2>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>203.0.113.9 - - [14/Aug/2026:12:00:01 +0000] "GET /api/users?id=1%20UNION%20SELECT%20password HTTP/1.1" 200 512 "https://example.com/" "sqlmap/1.8"</code></pre>
+        <p class="hint">
+          Time layout: <code>02/Jan/2006:15:04:05 -0700</code>.
+          Optional quoted referer + UA. Vhost form (<code>host ip - user [time] …</code>) is tried second
+          so the optional host cannot steal the IP.
+        </p>
+      </section>
+
+      <section class="block">
+        <h2>JSON (recommended)</h2>
+        <p class="hint">
+          Field names are a union of nginx, Caddy, and Traefik. Caddy’s nested
+          <code>request</code> object is flattened.
+        </p>
+        <table>
+          <thead><tr><th>We look for</th><th>Typical keys (first hit wins)</th></tr></thead>
+          <tbody>
+            <tr><td>Source IP</td><td><code>remote_addr</code> · <code>remote_ip</code> · <code>client_ip</code> · <code>src_ip</code></td></tr>
+            <tr><td>URL</td><td><code>request_uri</code> · <code>uri</code> · <code>url</code> · <code>path</code> · <code>request</code></td></tr>
+            <tr><td>Method</td><td><code>request_method</code> · <code>method</code></td></tr>
+            <tr><td>Status</td><td><code>status</code> · <code>status_code</code></td></tr>
+            <tr><td>UA</td><td><code>http_user_agent</code> · <code>user_agent</code></td></tr>
+            <tr><td>Time</td><td><code>time_iso8601</code> · RFC3339 · unix seconds/ms</td></tr>
+          </tbody>
+        </table>
+        <h3>nginx snippet</h3>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>log_format json_gwd escape=json
+  '{'
+    '"remote_addr":"$remote_addr",'
+    '"request_method":"$request_method",'
+    '"request_uri":"$request_uri",'
+    '"status":$status,'
+    '"body_bytes_sent":$body_bytes_sent,'
+    '"http_user_agent":"$http_user_agent",'
+    '"http_referer":"$http_referer",'
+    '"host":"$host",'
+    '"time_iso8601":"$time_iso8601"'
+  '}';
+access_log /var/log/nginx/access.json json_gwd;</code></pre>
+        <div class="callout warn">
+          <strong>Do not add the body</strong>
+          <code>$request_body</code> will eventually log a card number or a password.
+          Access-log SIEM is URL + UA + status. That is the contract. See <a href="11-limits-and-honesty.html">11</a>.
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>Decode</h2>
+        <p>
+          Matching runs on <code>DecodeForMatch(path, query)</code> — up to two
+          <code>url.QueryUnescape</code> passes so <code>%252e%252e</code> and
+          <code>%27or%271</code> become visible. Evidence in the UI is clipped around the regex hit.
+        </p>
+      </section>
+
+      <section class="block">
+        <h2>What we drop</h2>
+        <ul>
+          <li>Blank lines and <code>#</code> comments (IIS-style headers).</li>
+          <li>Lines that match neither JSON nor combined — counted on <code>/api/health</code> as <code>drop</code>.</li>
+        </ul>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 05 · next: <a href="06-detection-engine.html">06 · Detection engine</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

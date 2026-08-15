@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>15 · Production edge — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>15 · Production edge</h1>
+        <p class="lead">
+          How anyone stands this up: HTTPS UI with a login, agents on <em>their</em> web hosts,
+          allowlisted ingest, no secrets in git. Configure flags and env files — never hardcode hosts.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-15</span>
+          <span class="pill">All config, no inventory</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#config">What you configure</a>
+        <a href="#topo">Topology</a>
+        <a href="#auth">Two secrets</a>
+        <a href="#fix">Basic + Bearer</a>
+        <a href="#agent">Agents</a>
+        <a href="#geo">GeoIP</a>
+        <a href="#dont">Do not</a>
+      </nav>
+
+      <section class="block" id="config">
+        <h2>What you configure (nothing is baked in)</h2>
+        <table>
+          <thead><tr><th>Knob</th><th>Where</th><th>Example meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--listen</code></td><td>manager unit</td><td>Usually <code>127.0.0.1:8787</code> behind nginx, or <code>0.0.0.0:8787</code> if agents hit the port directly</td></tr>
+            <tr><td><code>--home</code></td><td>manager</td><td>Default map pin for <em>your</em> site: ISO country or <code>lat,lon</code></td></tr>
+            <tr><td><code>--homes</code></td><td>manager</td><td>Optional extra pins, keyed by agent <code>--name</code>. Example: <code>web-1=40.7,-74.0;proxy=DE</code></td></tr>
+            <tr><td><code>--token</code> / env</td><td>manager + every agent</td><td>Shared ingest secret. Generate on the box. Never commit it.</td></tr>
+            <tr><td><code>--url</code></td><td>agent</td><td>How the agent reaches the manager (internal IP, VPN, or hostname you choose)</td></tr>
+            <tr><td><code>--tail</code></td><td>agent</td><td>Comma-separated access logs <em>on that host</em></td></tr>
+            <tr><td><code>--name</code></td><td>agent</td><td>Label in the UI, e.g. <code>web-1</code></td></tr>
+            <tr><td><code>geoip.mmdb</code></td><td>manager working dir</td><td>Optional. Drop a GeoLite2 / DB-IP file; auto-loaded if present</td></tr>
+            <tr><td>nginx + htpasswd</td><td>monitor box</td><td>Your subdomain, your UI login. Snippets in <code>deploy/</code></td></tr>
+            <tr><td>firewall</td><td>monitor box</td><td>Allow ingest port only from <em>your</em> web-host addresses</td></tr>
+          </tbody>
+        </table>
+        <div class="callout info">
+          <strong>Samples, not your inventory</strong>
+          <code>deploy/*.example</code> uses placeholders (<code>MONITOR</code>, <code>WEBHOST</code>).
+          Copy them, fill in <em>your</em> values on the box, leave the examples untouched in git.
+        </div>
+      </section>
+
+      <section class="block" id="topo">
+        <h2>Topology</h2>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart LR
+  YOU[Your browser] -->|HTTPS + basic auth| NGX
+  subgraph MONITOR["Your monitor box"]
+    NGX["nginx TLS · deny /api/ingest"]
+    M["gpewebdefender serve"]
+    DOC["/docs/"]
+    NGX -->|Bearer injected| M
+  end
+  subgraph WEB["Your web hosts"]
+    A["gpewebdefender agent --name web-1"]
+    L["access.log"]
+    L --> A
+  end
+  A -->|allowlisted POST /api/ingest| M
+          </pre>
+        </div>
+      </section>
+
+      <section class="block" id="auth">
+        <h2>Two different secrets</h2>
+        <table>
+          <thead><tr><th>Secret</th><th>Who</th><th>Lives</th></tr></thead>
+          <tbody>
+            <tr><td>UI basic auth</td><td>Humans</td><td>nginx htpasswd on the monitor only</td></tr>
+            <tr><td>Ingest token</td><td>Manager + agents</td><td><code>/etc/gpewebdefender/token</code> and <code>/etc/gpewebdefender/env</code> (mode 640)</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="fix">
+        <h2>Basic + Bearer (do this or the UI 401-loops)</h2>
+        <p>
+          nginx basic auth and the app token both want the <code>Authorization</code> header.
+          After login the browser only sends <strong>Basic</strong>. The dashboard
+          <code>fetch</code> / EventSource do not attach Bearer. Fix: after basic auth succeeds,
+          nginx <strong>replaces</strong> <code>Authorization</code> with
+          <code>Bearer &lt;your token&gt;</code> before <code>proxy_pass</code>.
+          See <code>deploy/nginx-siem.conf.example</code>. Agents never use the public HTTPS ingest path.
+        </p>
+      </section>
+
+      <section class="block" id="agent">
+        <h2>Agents</h2>
+        <p>
+          Same binary. Only hosts that write HTTP access logs need one.
+          DBs, build boxes, and settlement nodes usually do not.
+        </p>
+        <p class="hint"><code>deploy/gpewebdefender-agent.service.example</code> — copy, fill, enable.</p>
+      </section>
+
+      <section class="block" id="geo">
+        <h2>GeoIP</h2>
+        <p>
+          Drop a country/city <code>.mmdb</code> at <code>/var/lib/gpewebdefender/geoip.mmdb</code>
+          (or pass <code>--geoip</code>). The manager loads it automatically.
+          Without it the feed still works; the map will not invent countries for real IPs.
+          DB-IP lite is fine; keep their attribution if you use it.
+        </p>
+      </section>
+
+      <section class="block" id="dont">
+        <h2>Do not</h2>
+        <ul>
+          <li>Hardcode anyone’s hostnames, IPs, or tokens in this repo</li>
+          <li>Open the ingest port to the whole internet</li>
+          <li>Expose <code>/api/ingest</code> on the public HTTPS vhost</li>
+          <li>Ship OSSEC/Wazuh “for completeness”</li>
+        </ul>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 15 · <a href="../index.html">hub</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

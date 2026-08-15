@@ -1,0 +1,69 @@
+# Host and application authentication. Fires on parsed auth.log / structured
+# login events. Does not alert on every SSH miss — reports still list them.
+# method LOGIN is reserved for application login events (see chapter 16).
+
+rules:
+  - id: linux.ssh.brute
+    title: SSH brute force
+    severity: high
+    category: hostauth
+    mitre: [T1110.001]
+    kind: threshold
+    group_by: src_ip
+    methods: [SSH]
+    status: [401]
+    count: 5
+    window: 60s
+
+  - id: linux.ssh.root
+    title: SSH failed login as root
+    severity: medium
+    category: hostauth
+    mitre: [T1110.001]
+    methods: [SSH]
+    status: [401]
+    fields: [user]
+    pattern: '^(root|admin|administrator)$'
+
+  - id: linux.ssh.invalid
+    title: SSH invalid user
+    severity: medium
+    category: hostauth
+    mitre: [T1110.001]
+    methods: [SSH]
+    fields: [query, url]
+    pattern: '(?i)invalid'
+
+  - id: linux.sudo.fail
+    title: sudo authentication failure
+    severity: medium
+    category: hostauth
+    mitre: [T1548.003]
+    methods: [SUDO]
+    status: [401]
+    fields: [method]
+    pattern: '^SUDO$'
+
+  - id: app.login.brute
+    title: Application login brute force
+    severity: high
+    category: applogin
+    mitre: [T1110]
+    kind: threshold
+    group_by: src_ip
+    methods: [LOGIN]
+    status: [401, 403]
+    count: 8
+    window: 120s
+
+  - id: app.login.fail
+    title: Application login failure
+    severity: low
+    category: applogin
+    mitre: [T1110]
+    methods: [LOGIN]
+    status: [401, 403]
+    fields: [method]
+    pattern: '^LOGIN$'
+    # Every fail is stored as an event. This rule also makes a low alert so
+    # the live feed is not silent while you wait for a brute window.

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>12 · Roadmap — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>12 · Roadmap</h1>
+        <p class="lead">
+          Living backlog. Ship the next slice only if it keeps the binary small and the sensor honest.
+          When something lands, move it to Done and update the matching chapter.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">v0.1.0 shipped</span>
+        </div>
+      </header>
+
+      <section class="block">
+        <h2>Done</h2>
+        <table>
+          <thead><tr><th>Item</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Combined + JSON parser, double-decode</td><td>05</td></tr>
+            <tr><td>41 rules: pattern, threshold, snoop</td><td>06 · 07 · 14</td></tr>
+            <tr><td>SQLite store, prune, SSE UI</td><td>02 · 08</td></tr>
+            <tr><td>serve / demo / agent CLI</td><td>03 · 04 · 09</td></tr>
+            <tr><td>Live attack map + optional GeoIP</td><td>13</td></tr>
+            <tr><td>Human snoop vs scanner + canaries + modern probes</td><td>14</td></tr>
+            <tr><td>Windows + Linux, no CGO</td><td>03</td></tr>
+            <tr><td>Dedicated-box deploy + DocHub at /docs/</td><td>10 · 08</td></tr>
+            <tr><td>Reports tab + web / Linux / app auth</td><td>16</td></tr>
+            <tr><td>auth.log parser (sshd / sudo / PAM only)</td><td>05 · 16</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block">
+        <h2>Next (worth doing)</h2>
+        <table>
+          <thead><tr><th>Item</th><th>Why</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Site-specific rule packs</td>
+              <td>Generic SQLi is table stakes; your login and admin paths are the product</td>
+              <td>YAML only. No engine change. Example on 06.</td>
+            </tr>
+            <tr>
+              <td>TLS or mTLS on ingest</td>
+              <td>Agents over an untrusted network</td>
+              <td>Or keep HTTP and force a tunnel. Do not invent a custom crypto stack.</td>
+            </tr>
+            <tr>
+              <td>Disk-backed agent queue</td>
+              <td>Manager down should not drop lines</td>
+              <td>v0.1 drops when the 256-line buffer fills</td>
+            </tr>
+            <tr>
+              <td>Hot reload rules</td>
+              <td>Avoid a restart to tune a regex</td>
+              <td>SIGHUP or a watched directory</td>
+            </tr>
+            <tr>
+              <td>Webhook / email on critical</td>
+              <td>A dashboard you are not staring at is not an alert</td>
+              <td>Keep it a POST of the alert JSON</td>
+            </tr>
+            <tr>
+              <td>Blocklist export</td>
+              <td>Top attacker IPs as a text file for fail2ban / nft</td>
+              <td>Export only. Still not a WAF.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block">
+        <h2>Later (maybe)</h2>
+        <table>
+          <thead><tr><th>Item</th><th>Condition</th></tr></thead>
+          <tbody>
+            <tr><td>Cloudflare / other edge log ingest</td><td>When those logs are the real sensor</td></tr>
+            <tr><td>City-level GeoIP + ASN / Tor / VPN flags</td><td>MMDB already optional; ASN/Tor is next</td></tr>
+            <tr><td>More syslog facilities (sudoers changes, sshd config)</td><td>Only if reports stay honest</td></tr>
+            <tr><td>VictoriaLogs (or similar) behind the same API</td><td>When SQLite search is actually the bottleneck</td></tr>
+            <tr><td>FIM / host agent</td><td>Different product. Do not sneak it into v0.x.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block">
+        <h2>Parked</h2>
+        <div class="callout warn">
+          <strong>Not until the sensor is boring</strong>
+          LLM “SOC analyst,” public SaaS multi-tenant cloud, Java indexers, packet capture,
+          and claiming PCI or a full SIEM feature matrix. Monitor first. Be trusted. Then grow.
+        </div>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 12 · end of set · back to <a href="../index.html">hub home</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

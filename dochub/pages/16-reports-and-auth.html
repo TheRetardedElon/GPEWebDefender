@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>16 · Reports &amp; auth — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>16 · Reports &amp; auth</h1>
+        <p class="lead">
+          The Live tab is the radar. Reports is the workbook: attack-vector mix,
+          web 401/403, Linux sshd/sudo, and application login failures you POST in.
+          Nothing about a specific product is compiled in.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Added 2026-08-15</span>
+          <span class="pill">v0.3.0</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#ui">UI</a>
+        <a href="#web">Web auth</a>
+        <a href="#linux">Linux auth</a>
+        <a href="#app">App logins</a>
+        <a href="#api">API</a>
+      </nav>
+
+      <section class="block" id="ui">
+        <h2>Two tabs</h2>
+        <table>
+          <thead><tr><th>Tab</th><th>For</th></tr></thead>
+          <tbody>
+            <tr><td>Live</td><td>Map, SSE feed, severity search. Same as v0.2.</td></tr>
+            <tr><td>Reports → Attack vectors</td><td>Category / rule / path / country / hourly mix from alerts.</td></tr>
+            <tr><td>Reports → Auth · Web</td><td>401/403 and login-path hits from access logs.</td></tr>
+            <tr><td>Reports → Auth · Linux</td><td>Parsed <code>auth.log</code> / <code>secure</code> (sshd, sudo, PAM, console login).</td></tr>
+            <tr><td>Reports → Auth · App</td><td>Structured <code>kind=applogin</code> events your application ships.</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          Host dropdown and 1h / 24h / 7d still apply. Empty panels tell you which sensor is missing.
+        </p>
+      </section>
+
+      <section class="block" id="web">
+        <h2>Web authentication</h2>
+        <p>
+          No extra shipper. Any access log already flowing in is enough.
+          Failures are <code>401</code> / <code>403</code>, or a path that looks like a login
+          (<code>/login</code>, <code>/signin</code>, <code>/auth</code>, <code>/wp-login</code>, <code>/session</code>).
+        </p>
+        <p>
+          Brute force is still <code>web.brute.login</code> and <code>web.scan.403storm</code> on the Live tab.
+          Reports list every fail, not only the threshold crossing.
+        </p>
+      </section>
+
+      <section class="block" id="linux">
+        <h2>Linux box authentication</h2>
+        <p>
+          Same agent, extra tail. We keep sshd failures / accepts, invalid users,
+          sudo auth failures, and a few PAM / console lines. Cron and kernel stay on the floor.
+        </p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpewebdefender agent \
+  --url http://MONITOR:8787 \
+  --token SECRET \
+  --name web-1 \
+  --tail /var/log/nginx/access.log \
+  --journal
+
+# Classic auth.log / secure still works if the file exists:
+#   --tail /var/log/auth.log
+# Debian 13+ is often journald-only — use --journal.
+
+# Linux-only box (no HTTP):
+gpewebdefender agent --url http://MONITOR:8787 --token SECRET --name db-1 --journal</code></pre>
+        <div class="callout info">
+          <strong>Still not OSSEC</strong>
+          This is an auth parser, not FIM, not rootkit, not every facility. If the line is not a login, we drop it.
+        </div>
+      </section>
+
+      <section class="block" id="app">
+        <h2>Application / platform login failures</h2>
+        <p>
+          Access logs cannot see a failed password POST. The application (or an API gateway)
+          must emit a structured event. <strong>Never send the password, cookie, or session secret.</strong>
+        </p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>POST /api/ingest
+Authorization: Bearer SECRET
+Content-Type: application/json
+X-SIEM-Source: app-api
+
+{
+  "kind": "applogin",
+  "src_ip": "203.0.113.9",
+  "user": "alice",
+  "path": "/api/login",
+  "status": 401,
+  "outcome": "fail",
+  "method": "LOGIN",
+  "host": "optional-vhost",
+  "ua": "optional",
+  "time": "2026-08-15T01:40:00Z"
+}</code></pre>
+        <table>
+          <thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>kind</code></td><td>yes</td><td><code>applogin</code> (aliases: <code>app</code>, <code>login</code>)</td></tr>
+            <tr><td><code>src_ip</code></td><td>yes</td><td>Client address as the app saw it (honor <code>X-Forwarded-For</code> only if you trust the hop)</td></tr>
+            <tr><td><code>user</code></td><td>strongly</td><td>Username or email. Not a password. Empty is allowed but the report is weaker.</td></tr>
+            <tr><td><code>outcome</code></td><td>yes</td><td><code>fail</code> or <code>ok</code></td></tr>
+            <tr><td><code>status</code></td><td>no</td><td>Defaults 401 on fail, 200 on ok</td></tr>
+            <tr><td><code>method</code></td><td>no</td><td>Use <code>LOGIN</code> so web-brute rules do not double-count</td></tr>
+            <tr><td><code>path</code></td><td>no</td><td>Which login route. Helps the path table.</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          A JSON array of those objects is a batch. Successes are optional; send them if you want a fail/ok ratio.
+          <code>app.login.fail</code> is a low alert per fail. <code>app.login.brute</code> is 8 fails / IP / 2 minutes.
+        </p>
+      </section>
+
+      <section class="block" id="api">
+        <h2>Report endpoints</h2>
+        <table>
+          <thead><tr><th>GET</th><th>Query</th><th>Body</th></tr></thead>
+          <tbody>
+            <tr><td><code>/api/reports/vectors</code></td><td><code>since</code>, <code>source</code></td><td>Category, rule, path, country, hourly, top IPs</td></tr>
+            <tr><td><code>/api/reports/auth</code></td><td><code>channel=web|linux|app</code>, <code>since</code>, <code>source</code></td><td>Fails, users, IPs, recent events</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 16 · back to <a href="../index.html">hub home</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

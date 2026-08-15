@@ -1,0 +1,83 @@
+# Modern web-platform probes: cloud secrets, API docs, debug knobs, URL bypasses.
+
+rules:
+  - id: web.recon.cloudfiles
+    title: Cloud / container secret file probe
+    severity: high
+    category: recon
+    mitre: [T1595.003]
+    tags: [probe]
+    fields: [path]
+    pattern: '(?i)(/\.(aws|kube)/|/\.docker/config\.json|/docker-compose\.ya?ml|/Dockerfile|/Procfile|/package\.json|/composer\.json|/pom\.xml|/Cargo\.toml|/go\.mod)'
+
+  - id: web.recon.env_extra
+    title: Env / dotenv variant probe
+    severity: high
+    category: recon
+    mitre: [T1595.003]
+    tags: [probe]
+    fields: [decoded]
+    pattern: '(?i)/\.env(\.(local|production|prod|staging|dev|backup|example|test)|rc|_sample)(/|$|\?)'
+
+  - id: web.recon.apidocs
+    title: API schema / Swagger / OpenAPI probe
+    severity: medium
+    category: recon
+    mitre: [T1595.002]
+    tags: [probe]
+    fields: [path]
+    pattern: '(?i)/(swagger(\.json|\.yaml)?|openapi(\.json|\.yaml)?|api-docs|v2/api-docs|v3/api-docs|redoc|swagger-ui)(/|$)'
+
+  - id: web.recon.graphql
+    title: GraphQL / introspection probe
+    severity: medium
+    category: recon
+    mitre: [T1595.002]
+    tags: [probe]
+    fields: [decoded]
+    pattern: '(?i)(/graphql|/graphiql|/altair|__schema|__type\b)'
+
+  - id: web.recon.debugbar
+    title: Debug toolbar / profiler probe
+    severity: medium
+    category: recon
+    mitre: [T1595.002]
+    tags: [probe]
+    fields: [path]
+    pattern: '(?i)(/_debugbar|/debugbar|/__debug|/telescope|/horizon|/phpinfo|/actuator/(env|heapdump|health|beans|mappings))'
+
+  - id: web.tamper.debug_param
+    title: Debug / admin query-parameter tamper
+    severity: medium
+    category: tamper
+    mitre: [T1190]
+    tags: [tamper]
+    fields: [query, decoded]
+    pattern: '(?i)(^|&)(debug|test|admin|dev|verbose|trace|preview)=(true|1|yes|on)\b'
+
+  - id: web.bypass.normalize
+    title: Path-normalization / proxy bypass
+    severity: high
+    category: bypass
+    mitre: [T1190]
+    tags: [bypass]
+    fields: [url, decoded]
+    pattern: '(?i)(//admin|/\.\.;/|;/|/%2fadmin|/admin\.\.;|/auth/\.\./)'
+
+  - id: web.bypass.header_hint
+    title: Reverse-proxy rewrite header in log
+    severity: high
+    category: bypass
+    mitre: [T1190]
+    tags: [bypass]
+    fields: [raw, decoded]
+    pattern: '(?i)(x-original-url|x-rewrite-url|x-forwarded-host)\s*[:=]\s*/'
+
+  - id: web.method.write
+    title: Unexpected write verb (PUT/DELETE/PATCH)
+    severity: low
+    category: recon
+    mitre: [T1190]
+    tags: [verb]
+    fields: [method]
+    pattern: '^(PUT|DELETE|PATCH)$'

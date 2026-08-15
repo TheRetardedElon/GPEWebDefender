@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>07 · Rule catalog — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main wide">
+      <header class="hero">
+        <h1>07 · Rule catalog</h1>
+        <p class="lead">
+          Built-in set across <code>rules/web.yaml</code>, <code>modern.yaml</code>,
+          <code>snoop.yaml</code>, and <code>canary.yaml</code> — <strong>41 rules</strong>.
+          Source of truth is the YAML; this table is the readable twin.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">41 rules</span>
+        </div>
+      </header>
+
+      <div class="callout info">
+        <strong>Sensor reminder</strong>
+        These match what an access log can see (URL, method, status, UA).
+        A SQLi in a POST body will not fire <code>web.sqli.*</code> unless it also appears in the query string.
+      </div>
+
+      <nav class="jump-nav">
+        <a href="#inj">Injection</a>
+        <a href="#recon">Recon</a>
+        <a href="#scan">Scanners</a>
+        <a href="#beh">Behavioral</a>
+        <a href="#modern">Modern</a>
+        <a href="#snoop">Snoop</a>
+        <a href="#canary">Canary</a>
+      </nav>
+
+      <section class="block" id="inj">
+        <h2>Injection &amp; RCE</h2>
+        <table>
+          <thead><tr><th>id</th><th>Title</th><th>Sev</th><th>MITRE</th></tr></thead>
+          <tbody>
+            <tr><td><code>web.sqli.union</code></td><td>SQL injection (UNION SELECT)</td><td>high</td><td>T1190</td></tr>
+            <tr><td><code>web.sqli.boolean</code></td><td>SQL injection (boolean / tautology)</td><td>high</td><td>T1190</td></tr>
+            <tr><td><code>web.sqli.time</code></td><td>SQL injection (time-based)</td><td>high</td><td>T1190</td></tr>
+            <tr><td><code>web.sqli.schema</code></td><td>SQL injection (schema / file recon)</td><td>high</td><td>T1190</td></tr>
+            <tr><td><code>web.sqli.stacked</code></td><td>SQL injection (stacked / destructive)</td><td>critical</td><td>T1190</td></tr>
+            <tr><td><code>web.xss.script</code></td><td>XSS (script / event handler)</td><td>high</td><td>T1190 · T1189</td></tr>
+            <tr><td><code>web.traversal</code></td><td>Path traversal</td><td>high</td><td>T1190</td></tr>
+            <tr><td><code>web.php.filter</code></td><td>PHP wrapper / filter RCE probe</td><td>critical</td><td>T1190</td></tr>
+            <tr><td><code>web.cmdi</code></td><td>Command injection in URL</td><td>critical</td><td>T1190</td></tr>
+            <tr><td><code>web.ssti</code></td><td>Template injection (SSTI)</td><td>high</td><td>T1190</td></tr>
+            <tr><td><code>web.ssrf.metadata</code></td><td>SSRF to cloud metadata</td><td>critical</td><td>T1190</td></tr>
+            <tr><td><code>web.crlf</code></td><td>CRLF / header injection</td><td>medium</td><td>T1190</td></tr>
+            <tr><td><code>web.log4shell</code></td><td>Log4Shell / JNDI lookup</td><td>critical</td><td>T1190</td></tr>
+            <tr><td><code>web.spring4shell</code></td><td>Spring4Shell class-loader probe</td><td>critical</td><td>T1190</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="recon">
+        <h2>Recon / sensitive paths</h2>
+        <table>
+          <thead><tr><th>id</th><th>Title</th><th>Sev</th><th>MITRE</th></tr></thead>
+          <tbody>
+            <tr><td><code>web.recon.env</code></td><td>Secret file probe (.env / credentials)</td><td>high</td><td>T1595.003</td></tr>
+            <tr><td><code>web.recon.git</code></td><td>Source-control probe (.git / .svn)</td><td>high</td><td>T1595.003</td></tr>
+            <tr><td><code>web.recon.backup</code></td><td>Backup / dump file probe</td><td>medium</td><td>T1595.003</td></tr>
+            <tr><td><code>web.recon.debug</code></td><td>Debug / actuator / server-status probe</td><td>medium</td><td>T1595.002</td></tr>
+            <tr><td><code>web.recon.admin</code></td><td>Admin / panel hunting</td><td>low</td><td>T1595.002</td></tr>
+            <tr><td><code>web.recon.cms</code></td><td>CMS / framework exploit path</td><td>medium</td><td>T1190</td></tr>
+            <tr><td><code>web.method.unusual</code></td><td>Unusual HTTP method</td><td>low</td><td>T1190</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="scan">
+        <h2>Scanners</h2>
+        <table>
+          <thead><tr><th>id</th><th>Title</th><th>Sev</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>web.scanner.ua</code></td>
+              <td>Known vulnerability scanner</td>
+              <td>medium</td>
+              <td>sqlmap, nikto, nuclei, nmap, ffuf, burp, zap, … Intentionally does <em>not</em> match generic <code>curl</code> / <code>python-requests</code>.</td>
+            </tr>
+            <tr>
+              <td><code>web.scanner.exploitdb</code></td>
+              <td>Exploit-kit / scripted attacker UA</td>
+              <td>medium</td>
+              <td>havij, pangolin, libwww-perl, zmeu, morfeus</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="beh">
+        <h2>Behavioral (threshold)</h2>
+        <table>
+          <thead><tr><th>id</th><th>Title</th><th>Sev</th><th>Trigger</th></tr></thead>
+          <tbody>
+            <tr><td><code>web.scan.404storm</code></td><td>Directory busting</td><td>medium</td><td>25 × status 404 / IP / 60s</td></tr>
+            <tr><td><code>web.scan.403storm</code></td><td>Auth-wall hammering</td><td>medium</td><td>15 × 401 or 403 / IP / 60s</td></tr>
+            <tr><td><code>web.brute.login</code></td><td>Web login brute force</td><td>high</td><td>8 × POST on login/auth/admin paths / IP / 60s</td></tr>
+            <tr><td><code>web.flood.ip</code></td><td>Single-IP request flood</td><td>medium</td><td>200 requests / IP / 10s</td></tr>
+            <tr><td><code>linux.ssh.brute</code></td><td>SSH brute force</td><td>high</td><td>5 × failed SSH / IP / 60s</td></tr>
+            <tr><td><code>app.login.brute</code></td><td>Application login brute</td><td>high</td><td>8 × <code>LOGIN</code> 401/403 / IP / 120s</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="modern">
+        <h2>Modern platform probes (<code>modern.yaml</code>)</h2>
+        <table>
+          <thead><tr><th>id</th><th>Title</th><th>Sev</th></tr></thead>
+          <tbody>
+            <tr><td><code>web.recon.cloudfiles</code></td><td>Cloud / container secret file</td><td>high</td></tr>
+            <tr><td><code>web.recon.env_extra</code></td><td>Extra dotenv variants</td><td>high</td></tr>
+            <tr><td><code>web.recon.apidocs</code></td><td>Swagger / OpenAPI</td><td>medium</td></tr>
+            <tr><td><code>web.recon.graphql</code></td><td>GraphQL / introspection</td><td>medium</td></tr>
+            <tr><td><code>web.recon.debugbar</code></td><td>Debug toolbar / actuator</td><td>medium</td></tr>
+            <tr><td><code>web.tamper.debug_param</code></td><td><code>?debug=true</code> / <code>?admin=1</code></td><td>medium</td></tr>
+            <tr><td><code>web.bypass.normalize</code></td><td>Path-normalization bypass</td><td>high</td></tr>
+            <tr><td><code>web.bypass.header_hint</code></td><td>Rewrite headers if logged</td><td>high</td></tr>
+            <tr><td><code>web.method.write</code></td><td>PUT / DELETE / PATCH</td><td>low</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="snoop">
+        <h2>Human snoop (<code>snoop.yaml</code>)</h2>
+        <table>
+          <thead><tr><th>id</th><th>Title</th><th>Sev</th><th>Trigger</th></tr></thead>
+          <tbody>
+            <tr><td><code>web.snoop.slow404</code></td><td>Manual 404 walk</td><td>high</td><td>5 distinct 404s, median gap ≥ 1.5s, empty referer, low assets</td></tr>
+            <tr><td><code>web.snoop.secret_hunt</code></td><td>Slow secret / admin hunt</td><td>high</td><td>4 distinct interesting paths, human cadence</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="canary">
+        <h2>Canaries (<code>canary.yaml</code>)</h2>
+        <table>
+          <thead><tr><th>id</th><th>Title</th><th>Sev</th></tr></thead>
+          <tbody>
+            <tr><td><code>web.canary.robots_trap</code></td><td>Trap path from robots.txt</td><td>critical</td></tr>
+            <tr><td><code>web.canary.internal_sync</code></td><td>Fake internal API path</td><td>critical</td></tr>
+            <tr><td><code>web.canary.fake_archive</code></td><td>Fake backup.zip / dump.sql</td><td>high</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">How to plant them: <a href="14-snoop-and-canaries.html">14</a>.</p>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 07 · next: <a href="08-ui-and-api.html">08 · UI &amp; API</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

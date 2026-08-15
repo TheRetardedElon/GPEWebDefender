@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>14 · Snoop &amp; canaries — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>14 · Snoop &amp; canaries</h1>
+        <p class="lead">
+          A person typing <code>/admin</code>, then <code>/.env</code>, then <code>/swagger.json</code>
+          every few seconds is not ffuf. This chapter is how we tell those apart, what else we watch
+          on a web platform, and how trap paths give you a near-zero false-positive page.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">kind: snoop</span>
+          <span class="pill">canary · modern probes</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#human">Human vs scanner</a>
+        <a href="#probes">What we watch</a>
+        <a href="#canary">Canaries</a>
+        <a href="#limits">What logs cannot see</a>
+      </nav>
+
+      <section class="block" id="human">
+        <h2>Human vs scanner</h2>
+        <table>
+          <thead><tr><th></th><th>Automated bust</th><th>Manual snoop</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Cadence</td>
+              <td>Tens–hundreds of req/s, almost no jitter</td>
+              <td>One hit every 2–15s, messy pauses</td>
+            </tr>
+            <tr>
+              <td>Assets</td>
+              <td>Almost never loads CSS/JS/images</td>
+              <td>Address-bar / Burp: also no assets. Real browser tour: lots of assets</td>
+            </tr>
+            <tr>
+              <td>Referer</td>
+              <td>Empty or the tool’s own</td>
+              <td>Empty when they type the URL</td>
+            </tr>
+            <tr>
+              <td>Our rule</td>
+              <td><code>web.scan.404storm</code> — 25 × 404 / 60s</td>
+              <td><code>web.snoop.slow404</code> / <code>web.snoop.secret_hunt</code> — 4–5 distinct interesting paths, median gap ≥ 1.5s, low asset ratio</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout info">
+          <strong>Both can be true</strong>
+          A nuclei run still lights scanner-UA + individual <code>/.env</code> rules.
+          A bored human never hits 25 requests a second, so they never look like a storm.
+          That is the point of <code>kind: snoop</code>.
+        </div>
+      </section>
+
+      <section class="block" id="probes">
+        <h2>Web-platform things we now watch</h2>
+        <table>
+          <thead><tr><th>Class</th><th>Examples</th><th>File</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Classic secrets</td>
+              <td><code>/.env</code>, <code>/.git/config</code>, backups</td>
+              <td><code>web.yaml</code></td>
+            </tr>
+            <tr>
+              <td>Cloud / app manifests</td>
+              <td><code>/.aws/credentials</code>, <code>/.kube/config</code>, Docker, <code>package.json</code>, <code>composer.json</code></td>
+              <td><code>modern.yaml</code></td>
+            </tr>
+            <tr>
+              <td>API surface</td>
+              <td>Swagger / OpenAPI, GraphQL introspection, debugbar, Spring actuator</td>
+              <td><code>modern.yaml</code></td>
+            </tr>
+            <tr>
+              <td>Tamper knobs</td>
+              <td><code>?debug=true</code>, <code>?admin=1</code></td>
+              <td><code>modern.yaml</code></td>
+            </tr>
+            <tr>
+              <td>Proxy bypass</td>
+              <td><code>//admin</code>, <code>/admin/..;/</code>, <code>X-Original-URL</code> if you log it</td>
+              <td><code>modern.yaml</code></td>
+            </tr>
+            <tr>
+              <td>Slow hunt</td>
+              <td>Human-paced 404 / admin / secret walk</td>
+              <td><code>snoop.yaml</code></td>
+            </tr>
+            <tr>
+              <td>Traps</td>
+              <td>Paths nobody honest should ever request</td>
+              <td><code>canary.yaml</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="canary">
+        <h2>Canaries (you plant them, we watch)</h2>
+        <p class="hint">
+          The SIEM cannot inject HTML into your app. You add a decoy; we alert on the first GET.
+          One hit is enough. Severity is critical on purpose.
+        </p>
+        <table>
+          <thead><tr><th>Plant this on the site</th><th>We alert on</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>robots.txt</code> → <code>Disallow: /super-admin-backup-2026/</code></td>
+              <td><code>web.canary.robots_trap</code></td>
+            </tr>
+            <tr>
+              <td>HTML comment: <code>&lt;!-- debug: /internal-sync/v1 --&gt;</code></td>
+              <td><code>web.canary.internal_sync</code></td>
+            </tr>
+            <tr>
+              <td>A route that 403s <code>/backup.zip</code> (do not serve a real dump)</td>
+              <td><code>web.canary.fake_archive</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout good">
+          <strong>Add your own</strong>
+          Drop another YAML in <code>rules/</code> or <code>--rules</code>.
+          Any path your real users never touch is a good canary. Rename the defaults if you publish this doc.
+        </div>
+      </section>
+
+      <section class="block" id="limits">
+        <h2>What access logs still cannot see</h2>
+        <ul>
+          <li><strong>POST GraphQL bodies</strong> — introspection in the body only shows up if you log the query string or a WAF field.</li>
+          <li><strong>Spoof headers</strong> (<code>X-Original-URL</code>) — only if your JSON access log includes them.</li>
+          <li><strong>Burp vs Chrome</strong> — we infer from cadence + assets + referer, not from TLS JA3.</li>
+        </ul>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 14 · back to <a href="../index.html">hub home</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

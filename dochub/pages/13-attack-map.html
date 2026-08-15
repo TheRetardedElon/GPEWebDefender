@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>13 · Attack map — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>13 · Attack map</h1>
+        <p class="lead">
+          Live arcs from attacker country to the host you are defending.
+          Same idea as a public “threat map,” without a globe SaaS or a Java stack.
+          It plots <em>alerts we already fired</em> — not a second sensor.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">Color key · click to filter</span>
+          <span class="pill">Canvas · no API key</span>
+          <span class="pill">Optional .mmdb</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#what">What it shows</a>
+        <a href="#pipe">Pipeline</a>
+        <a href="#geo">Geo lookup</a>
+        <a href="#home">Home pin</a>
+        <a href="#honest">Honesty</a>
+      </nav>
+
+      <section class="block" id="what">
+        <h2>What it shows</h2>
+        <table>
+          <thead><tr><th>Widget</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr><td>Attack arcs</td><td>Alert + source IP → country centroid (or city if an MMDB is loaded)</td></tr>
+            <tr><td>Home pulse</td><td><code>--home</code> ISO country or <code>lat,lon</code>. Extra pins via <code>--homes</code></td></tr>
+            <tr><td>Host picker</td><td>Dropdown: one source, or all homes at once. Arcs land on the pin that matches <code>X-SIEM-Source</code>.</td></tr>
+            <tr><td>Origin countries</td><td>Counts from alerts in the last 24h</td></tr>
+            <tr><td>Type key</td><td>Color = category (SQLi, snoop, canary, scanner…). Click to filter map + feed.</td></tr>
+            <tr><td>Live particle</td><td>SSE <code>alert</code> events that have geo</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          It does <strong>not</strong> ingest WAF engines, nftables, or Layer-4 PCAP.
+          Those are later sensors. The map is attribution for the web-attack feed you already have.
+        </p>
+      </section>
+
+      <section class="block" id="pipe">
+        <h2>Pipeline</h2>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart LR
+  LOG[access.log] --> DET[rules]
+  DET --> GEO[geo.Lookup]
+  GEO --> AL[alert + country/lat/lon]
+  AL --> DB[(SQLite)]
+  AL --> SSE[SSE]
+  DB --> API["GET /api/map"]
+  SSE --> UI[canvas arcs]
+  API --> UI
+          </pre>
+        </div>
+      </section>
+
+      <section class="block" id="geo">
+        <h2>How an IP becomes a dot</h2>
+        <ol>
+          <li>Private / loopback / link-local → no plot (your LAN is not an attacker country).</li>
+          <li>Built-in pin table (demo IPs and a few well-known scanner ranges) → ISO country → centroid + slight jitter.</li>
+          <li>Optional <code>--geoip /path/to/GeoLite2-City.mmdb</code> (or Country, or a DB-IP MMDB) → real country/city.</li>
+        </ol>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>gpewebdefender serve --tail /var/log/nginx/access.log --home US --geoip /var/lib/gpewebdefender/GeoLite2-City.mmdb
+gpewebdefender serve --home 40.7,-74.0 --homes "web-1=40.7,-74.0;edge-eu=51.5,-0.12"
+gpewebdefender demo --home 40.7,-74.0</code></pre>
+        <div class="callout info">
+          <strong>We do not ship a GeoIP file</strong>
+          MaxMind GeoLite2 needs their license (free). DB-IP publishes a country lite MMDB with attribution.
+          Drop the file next to the binary and pass <code>--geoip</code>. Demo mode does not need it — pins cover the fake IPs.
+        </div>
+      </section>
+
+      <section class="block" id="home">
+        <h2>Home pin</h2>
+        <table>
+          <thead><tr><th>Flag</th><th>Example</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--home US</code></td><td>default</td><td>Country centroid</td></tr>
+            <tr><td><code>--home DE</code></td><td></td><td>Any ISO code we have a centroid for</td></tr>
+            <tr><td><code>--home 51.5,-0.12</code></td><td></td><td>Exact server coordinates</td></tr>
+            <tr><td><code>--homes "a=40.7,-74.0;b=DE"</code></td><td></td><td>One pin per agent name. Semicolon-separated because <code>lat,lon</code> already uses a comma. Close pins are fanned out so they do not stack.</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          The UI default is <strong>All hosts</strong> — every configured pin, every source.
+          Pick a name in the header to isolate one box. The choice is stored in <code>localStorage</code>, not on the server.
+        </p>
+      </section>
+
+      <section class="block" id="honest">
+        <h2>Honesty vs the Radware-style maps</h2>
+        <table>
+          <thead><tr><th>They often imply</th><th>We actually do</th></tr></thead>
+          <tbody>
+            <tr><td>Every packet on the internet</td><td>Alerts from <em>your</em> access logs</td></tr>
+            <tr><td>City-accurate arcs with no config</td><td>Country centroids unless you load an MMDB</td></tr>
+            <tr><td>Layer 4 SYN floods, Slowloris, nft drops</td><td>Not yet — still a web-log monitor</td></tr>
+            <tr><td>VPN / Tor / ASN classification</td><td>Not yet. Scanner UAs we already detect in rules.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>Demo is still fake</strong>
+          <code>gpewebdefender demo</code> invents IPs that are pinned to countries so the map moves.
+          That is not the world attacking you. See <a href="04-demo-vs-live.html">04</a>.
+        </div>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 13 · back to <a href="../index.html">hub home</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

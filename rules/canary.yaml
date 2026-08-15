@@ -1,0 +1,31 @@
+# Trap / canary paths. Legitimate users have no reason to hit these.
+# Put the same paths in robots.txt or an HTML comment on the site — the SIEM
+# just watches. A single hit is enough.
+
+rules:
+  - id: web.canary.robots_trap
+    title: Canary path from robots.txt trap
+    severity: critical
+    category: canary
+    mitre: [T1595.002]
+    tags: [canary]
+    fields: [path]
+    pattern: '(?i)^/(super-admin-backup-2026|hidden-admin-do-not-index)(/|$)'
+
+  - id: web.canary.internal_sync
+    title: Canary path (fake internal API)
+    severity: critical
+    category: canary
+    mitre: [T1595.002]
+    tags: [canary]
+    fields: [path]
+    pattern: '(?i)^/internal-sync(/|$)|^/internal-sync/v1'
+
+  - id: web.canary.fake_archive
+    title: Canary archive / dump download
+    severity: high
+    category: canary
+    mitre: [T1595.003]
+    tags: [canary]
+    fields: [path]
+    pattern: '(?i)^/(backup\.zip|dump\.sql|site-backup\.tar\.gz|wwwroot\.zip)$'

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>10 · Deploy — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>10 · Deploy</h1>
+        <p class="lead">
+          Dedicated monitor box + a tiny agent on each host that has access logs.
+          Bind the manager to localhost. Do not put real hostnames, IPs, or secrets in docs or git.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">2 CPU / 2 GB is enough</span>
+          <span class="pill warn">Localhost only</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#size">Box size</a>
+        <a href="#topo">Topology</a>
+        <a href="#manager">Manager</a>
+        <a href="#agent">Agent</a>
+        <a href="#docs">Docs on the box</a>
+        <a href="#gate">See the UI</a>
+      </nav>
+
+      <section class="block" id="size">
+        <h2>Box size</h2>
+        <p>
+          A <strong>2 vCPU / 2 GB RAM</strong> Linux VPS is plenty. The manager idles around
+          a few megabytes of RSS. Disk: SQLite + WAL; 20 GB is already generous.
+          Put it on its <em>own</em> box so a monitor crash cannot touch the web app.
+        </p>
+      </section>
+
+      <section class="block" id="topo">
+        <h2>Topology</h2>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart LR
+  YOU[Operator] -->|SSH tunnel or gated HTTPS| M
+  subgraph MONITOR["Monitor box"]
+    M["gpewebdefender serve :8787 localhost"]
+    DOC["/docs/ this DocHub"]
+  end
+  subgraph WEB["Web hosts that have access logs"]
+    A1["gpewebdefender agent --name web-1"]
+    A2["gpewebdefender agent --name web-2"]
+  end
+  subgraph SKIP["Hosts with no HTTP"]
+    X[No agent needed for web attacks]
+  end
+  A1 -->|POST /api/ingest + token| M
+  A2 --> M
+          </pre>
+        </div>
+        <p class="diagram-caption">
+          Only machines that write HTTP access logs need an agent.
+          Settlement nodes, build boxes, and databases do not generate web-attack telemetry.
+        </p>
+      </section>
+
+      <section class="block" id="manager">
+        <h2>Manager (monitor box)</h2>
+        <ol>
+          <li>Copy the Linux binary to <code>/usr/local/bin/gpewebdefender</code>.</li>
+          <li>System user <code>gpewebdefender</code>, home <code>/var/lib/gpewebdefender</code>.</li>
+          <li>Copy <code>rules/*.yaml</code> to <code>/var/lib/gpewebdefender/rules</code> (cwd of the service).</li>
+          <li>Copy this DocHub to <code>/var/lib/gpewebdefender/dochub</code>.</li>
+          <li>Put a long random ingest secret in <code>/etc/gpewebdefender/token</code> (mode 640). Load it via an env file — do not paste it into git or this page.</li>
+        </ol>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>[Unit]
+Description=gpewebdefender web-attack monitor
+After=network.target
+
+[Service]
+Type=simple
+User=gpewebdefender
+Group=gpewebdefender
+WorkingDirectory=/var/lib/gpewebdefender
+EnvironmentFile=/etc/gpewebdefender/env
+ExecStart=/usr/local/bin/gpewebdefender serve \
+  --listen 127.0.0.1:8787 \
+  --db /var/lib/gpewebdefender/gpewebdefender.db \
+  --home 40.7,-74.0 \
+  --token ${GWD_TOKEN} \
+  --retain 168h
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+        <p class="hint">
+          <code>/etc/gpewebdefender/env</code> is one line: <code>GWD_TOKEN=…</code> generated on the box.
+          <code>--home</code> is the <em>defended site</em> (map pin), not the monitor’s city.
+          Do not <code>--tail</code> on the manager if logs live on other hosts.
+        </p>
+        <div class="callout warn">
+          <strong>Firewall</strong>
+          Allow SSH. Do <strong>not</strong> allow 8787 from the internet.
+          If agents must reach ingest, allowlist <em>only</em> those host IPs (keep them out of git).
+        </div>
+      </section>
+
+      <section class="block" id="agent">
+        <h2>Agent (each web host)</h2>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpewebdefender agent \
+  --url http://MONITOR_INTERNAL:8787 \
+  --token "$(cat /etc/gpewebdefender/token)" \
+  --tail /var/log/nginx/access.log \
+  --name web-1</code></pre>
+        <p>
+          Prefer a private NIC, VPN, or SSH tunnel over exposing ingest.
+          <code>--name</code> is the label in the UI. Same binary as the manager.
+        </p>
+      </section>
+
+      <section class="block" id="docs">
+        <h2>Docs on the box</h2>
+        <p>
+          If <code>./dochub/index.html</code> exists in the working directory, the manager serves this
+          DocHub at <strong><code>/docs/</code></strong>. The live UI has a Docs link in the header.
+        </p>
+      </section>
+
+      <section class="block" id="gate">
+        <h2>See the UI</h2>
+        <table>
+          <thead><tr><th>Pattern</th><th>When</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>ssh -L 8787:127.0.0.1:8787 user@monitor</code></td>
+              <td>Day one. Then http://127.0.0.1:8787 and http://127.0.0.1:8787/docs/</td>
+            </tr>
+            <tr>
+              <td>nginx TLS + auth → <code>proxy_pass http://127.0.0.1:8787</code></td>
+              <td>A real subdomain later. Gate the UI. Allowlist ingest.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout risk">
+          <strong>Health is open</strong>
+          <code>GET /api/health</code> is unauthenticated. Do not publish port 8787.
+        </div>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 10 · next: <a href="11-limits-and-honesty.html">11 · Limits &amp; honesty</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

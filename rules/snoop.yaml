@@ -1,0 +1,36 @@
+# Human-paced recon vs automated busting.
+# Scanner storms stay in web.yaml (25×404 / 60s).
+# These fire when someone slowly walks interesting 404s / admin paths.
+
+rules:
+  - id: web.snoop.slow404
+    title: Manual 404 walk (human cadence)
+    severity: high
+    category: snoop
+    mitre: [T1595.003]
+    tags: [human, snoop]
+    kind: snoop
+    group_by: src_ip
+    status: [404]
+    count: 5
+    distinct_paths: 5
+    window: 8m
+    min_gap: 1500ms
+    max_asset_ratio: 0.25
+    empty_referer: true
+
+  - id: web.snoop.secret_hunt
+    title: Slow hunt for secrets / admin paths
+    severity: high
+    category: snoop
+    mitre: [T1595.003]
+    tags: [human, snoop]
+    kind: snoop
+    group_by: src_ip
+    count: 4
+    distinct_paths: 4
+    window: 10m
+    min_gap: 1500ms
+    max_asset_ratio: 0.3
+    fields: [path, decoded]
+    pattern: '(?i)(\.env|/admin|/administrator|/wp-admin|/phpmyadmin|/\.git|/swagger|/openapi|/graphql|/\.aws|/actuator|/backup|/debug)'

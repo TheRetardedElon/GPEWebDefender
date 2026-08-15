@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>02 · Architecture — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>02 · Architecture</h1>
+        <p class="lead">
+          One binary, three commands. A line of log becomes an event; a matching rule becomes an alert.
+          Grounded in the packages under <code>internal/</code>.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">Go 1.22+</span>
+          <span class="pill">modernc.org/sqlite · no CGO</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#binary">Binary</a>
+        <a href="#flow">Line → alert</a>
+        <a href="#tree">Repo tree</a>
+        <a href="#store">Store</a>
+      </nav>
+
+      <section class="block" id="binary">
+        <h2>One binary, three commands</h2>
+        <table>
+          <thead><tr><th>Command</th><th>Process</th><th>Code</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>gpewebdefender serve</code></td>
+              <td>Manager: optional tail + UI + API + detection</td>
+              <td><code>cmd/gpewebdefender/main.go</code> → <code>serveCmd</code></td>
+            </tr>
+            <tr>
+              <td><code>gpewebdefender demo</code></td>
+              <td>Manager + invented attack lines</td>
+              <td><code>internal/demo</code></td>
+            </tr>
+            <tr>
+              <td><code>gpewebdefender agent</code></td>
+              <td>Tail files, POST batches to <code>/api/ingest</code></td>
+              <td><code>agentCmd</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="flow">
+        <h2>How a line becomes an alert</h2>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart TB
+  subgraph IN["ingest"]
+    TAIL["tail.Follow"]
+    HTTP["POST /api/ingest"]
+    DEMO["demo.Run"]
+  end
+
+  subgraph PIPE["internal/pipeline"]
+    PARSE["parse.Parse<br/>combined or JSON"]
+    DEC["DecodeForMatch ×2"]
+    EV["event.Event"]
+    ENG["detect.Engine.Evaluate"]
+    AL["event.Alert[]"]
+  end
+
+  subgraph OUT["persist + fanout"]
+    SQL[("store SQLite WAL")]
+    HUB["hub SSE"]
+    UI["ui/ index.html"]
+  end
+
+  TAIL --> PARSE
+  HTTP --> PARSE
+  DEMO --> PARSE
+  PARSE --> DEC --> EV
+  EV --> SQL
+  EV --> ENG --> AL
+  AL --> SQL
+  AL --> HUB --> UI
+          </pre>
+        </div>
+        <p class="diagram-caption">
+          <code>Pipeline.IngestLine</code> is the only write path. Parser failure increments
+          <code>Dropped</code> and is silent otherwise — garbage lines do not crash the box.
+        </p>
+      </section>
+
+      <section class="block" id="tree">
+        <h2>Repo tree</h2>
+        <div class="tree">
+          <div class="tree-node root">gpewebdefender <span class="path">module gpewebdefender</span></div>
+          <div class="tree-children">
+            <div class="tree-node"><span class="name">cmd/gpewebdefender</span><span class="path">main.go</span><span class="desc">CLI: serve · demo · agent · version</span></div>
+            <div class="tree-node"><span class="name">internal/parse</span><span class="desc">Combined + JSON → Event. Double URL-decode.</span></div>
+            <div class="tree-node"><span class="name">internal/detect</span><span class="desc">YAML rules, pattern + threshold windows.</span></div>
+            <div class="tree-node"><span class="name">internal/store</span><span class="desc">SQLite events/alerts, prune, stats.</span></div>
+            <div class="tree-node"><span class="name">internal/pipeline</span><span class="desc">IngestLine / IngestEvent glue.</span></div>
+            <div class="tree-node"><span class="name">internal/tail</span><span class="desc">Poll follow + rotation (size shrink → rewind).</span></div>
+            <div class="tree-node"><span class="name">internal/hub</span><span class="desc">SSE fan-out to browsers.</span></div>
+            <div class="tree-node"><span class="name">internal/server</span><span class="desc">HTTP API + embedded UI. Token on /api/*.</span></div>
+            <div class="tree-node"><span class="name">internal/demo</span><span class="desc">Invented attack lines. Not a network client.</span></div>
+            <div class="tree-node"><span class="name">rules/</span><span class="desc">web.yaml + embed fallback.</span></div>
+            <div class="tree-node"><span class="name">ui/</span><span class="desc">index.html · app.css · app.js embed.</span></div>
+            <div class="tree-node"><span class="name">dochub/</span><span class="desc">This documentation site.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" id="store">
+        <h2>Store &amp; retention</h2>
+        <table>
+          <thead><tr><th>Table</th><th>What</th><th>Retention</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>events</code></td>
+              <td>Every parsed request</td>
+              <td><code>--retain</code> (default 168h). Pruned every 30 minutes.</td>
+            </tr>
+            <tr>
+              <td><code>alerts</code></td>
+              <td>Rule hits</td>
+              <td>Kept 4× event retain so the SOC view still has history.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout info">
+          <strong>Why SQLite</strong>
+          Pure Go driver (<code>modernc.org/sqlite</code>) so Windows and Linux cross-compile with
+          <code>CGO_ENABLED=0</code>. For a single platform this is enough. We do not start a search cluster
+          until events outgrow a file. See <a href="11-limits-and-honesty.html">11</a>.
+        </div>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 02 · next: <a href="03-install-and-run.html">03 · Install &amp; run</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

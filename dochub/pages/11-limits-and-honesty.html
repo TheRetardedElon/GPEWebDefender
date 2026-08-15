@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>11 · Limits &amp; honesty — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>11 · Limits &amp; honesty</h1>
+        <p class="lead">
+          What this monitor can see, what it will lie about if you ask too much of it,
+          and the resource contract. If we miss these numbers, we failed.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill risk">Access-log ceiling</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#see">What we see</a>
+        <a href="#fp">False positives</a>
+        <a href="#res">Resources</a>
+        <a href="#wont">Will not add</a>
+      </nav>
+
+      <section class="block" id="see">
+        <h2>Access-log ceiling</h2>
+        <table>
+          <thead><tr><th>Visible</th><th>Invisible</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Method, path, query string, status, UA, referer, client IP, bytes</td>
+              <td>POST / PUT bodies</td>
+            </tr>
+            <tr>
+              <td>GET-based SQLi, XSS, traversal, exploit-path hunting</td>
+              <td>SQLi or XSS that exists only in a JSON body</td>
+            </tr>
+            <tr>
+              <td>Scanner user-agents, 404 storms, login POSTs to known paths</td>
+              <td>Authenticated abuse that looks like normal traffic</td>
+            </tr>
+            <tr>
+              <td>What nginx logged</td>
+              <td>What nginx never saw (direct-to-app bypass, non-HTTP)</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout risk">
+          <strong>Do not “fix” this by logging bodies</strong>
+          Access logs with <code>$request_body</code> will eventually contain passwords, tokens, or card data.
+          If you need POST visibility, ingest a dedicated app/WAF audit stream that is already redacted — later.
+        </div>
+      </section>
+
+      <section class="block" id="fp">
+        <h2>False positives (known)</h2>
+        <table>
+          <thead><tr><th>Rule</th><th>Typical FP</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>web.xss.script</code></td>
+              <td>Asset URLs that look like markup</td>
+              <td><code>not_pattern</code> skips common static extensions</td>
+            </tr>
+            <tr>
+              <td><code>web.recon.backup</code></td>
+              <td>Real downloads named <code>.zip</code> / <code>.sql</code></td>
+              <td>Expect some noise; filter the UI or tighten the pattern</td>
+            </tr>
+            <tr>
+              <td><code>web.scan.404storm</code></td>
+              <td>A broken crawler or a bad deploy that 404s everything</td>
+              <td>Raise <code>count</code> if your site is noisy</td>
+            </tr>
+            <tr>
+              <td><code>web.brute.login</code></td>
+              <td>A legit app that POSTs <code>/api/auth</code> a lot (token refresh)</td>
+              <td>Narrow <code>path_contains</code> to the real login path</td>
+            </tr>
+            <tr>
+              <td><code>web.scanner.ua</code></td>
+              <td>A security team running nuclei against themselves</td>
+              <td>That is a true positive from the monitor’s point of view</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="res">
+        <h2>Resource contract</h2>
+        <table>
+          <thead><tr><th>Piece</th><th>Target</th></tr></thead>
+          <tbody>
+            <tr><td>Manager + SQLite, small site</td><td>Comfortable on <strong>1 GB RAM</strong>. No JVM.</td></tr>
+            <tr><td>Agent</td><td>Tiny — tail + HTTP client</td></tr>
+            <tr><td>CPU</td><td>Idle near nothing; regex per line is cheap at typical web QPS</td></tr>
+            <tr><td>Disk</td><td>SQLite + WAL. Event prune default 7 days; alerts kept 4× that</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          If you need billions of rows of search, do not add OpenSearch. Next store is a purpose-built
+          log engine (VictoriaLogs class), not a Java indexer. See <a href="12-roadmap.html">12</a>.
+        </p>
+      </section>
+
+      <section class="block" id="wont">
+        <h2>What we will not add “just because”</h2>
+        <ul>
+          <li>OpenSearch / Elasticsearch / Graylog as a dependency.</li>
+          <li>A JVM for any reason.</li>
+          <li>Logging request bodies that might contain secrets or card data.</li>
+          <li>A public UI with no gate on a product host.</li>
+          <li>Pretending this is a WAF or a full SOC.</li>
+        </ul>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 11 · next: <a href="12-roadmap.html">12 · Roadmap</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

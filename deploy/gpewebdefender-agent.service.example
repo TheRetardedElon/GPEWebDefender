@@ -1,0 +1,22 @@
+# Copy to /etc/systemd/system/gpewebdefender-agent.service on a *web* host.
+# Do not commit real hostnames, IPs, or tokens.
+#
+#   scp root@MONITOR:/usr/local/bin/gpewebdefender /usr/local/bin/gpewebdefender
+#   printf 'GWD_TOKEN=%s\n' "$(cat /etc/gpewebdefender/token)" > /etc/gpewebdefender/env
+#
+# Comma-separate more access logs on --tail if needed.
+
+[Unit]
+Description=gpewebdefender log shipper
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/gpewebdefender/env
+ExecStart=/usr/local/bin/gpewebdefender agent --url http://MONITOR:8787 --token ${GWD_TOKEN} --name WEBHOST --tail /var/log/nginx/access.log --journal
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+

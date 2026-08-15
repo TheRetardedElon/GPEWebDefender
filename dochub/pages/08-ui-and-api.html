@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>08 · UI &amp; API — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>08 · UI &amp; API</h1>
+        <p class="lead">
+          Embedded three-file UI (<code>ui/index.html</code>, <code>app.css</code>, <code>app.js</code>).
+          API in <code>internal/server</code>. Live feed is SSE, not WebSocket.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">Default :8787</span>
+        </div>
+      </header>
+
+      <section class="block">
+        <h2>UI</h2>
+        <table>
+          <thead><tr><th>Surface</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td>Live / Reports tabs</td><td>Live is the map + feed. Reports: attack vectors, web 401/403, Linux auth, application logins. See <a href="16-reports-and-auth.html">16</a>.</td></tr>
+            <tr><td>Host dropdown</td><td><strong>All hosts</strong> (fleet map + stats) or one agent <code>--name</code>. Remembered in the browser.</td></tr>
+            <tr><td>Stat cards</td><td>Events/1h, alerts/1h, critical/1h, unique attacker IPs/1h, rules loaded. Follow the host filter.</td></tr>
+            <tr><td>Live alerts</td><td>Filter by host + severity + search (IP, path, rule). Click a row for detail.</td></tr>
+            <tr><td>Attackers</td><td>Top source IPs last 24h. Click to pin search to that IP.</td></tr>
+            <tr><td>Last hour bars</td><td>Alert counts by category</td></tr>
+            <tr><td>Live dot</td><td>Green while EventSource is open</td></tr>
+          </tbody>
+        </table>
+        <div class="callout info">
+          <strong>UI vs docs</strong>
+          <code>serveUI</code> will not walk the process cwd. Unknown paths 404.
+          That is so a <code>--</listen 0.0.0.0</code> mistake cannot become a file server.
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>HTTP API</h2>
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>GET</td><td><code>/docs/</code></td><td>open</td><td>This DocHub (if installed next to the manager)</td></tr>
+            <tr><td>GET</td><td><code>/api/health</code></td><td>open</td><td><code>ok</code>, <code>seen</code>, <code>fired</code>, <code>drop</code>, <code>rules</code></td></tr>
+            <tr><td>GET</td><td><code>/api/map</code></td><td>token if set</td><td>Home pin(s), arcs, country counts. Query: <code>since</code>, <code>limit</code>, <code>source</code>. See <a href="13-attack-map.html">13</a>.</td></tr>
+            <tr><td>GET</td><td><code>/api/sources</code></td><td>token if set</td><td>Distinct agent names + configured homes. Feeds the host dropdown.</td></tr>
+            <tr><td>GET</td><td><code>/api/reports/vectors</code></td><td>token if set</td><td><code>since</code>, <code>source</code>. Category / rule / path / country / hourly mix.</td></tr>
+            <tr><td>GET</td><td><code>/api/reports/auth</code></td><td>token if set</td><td><code>channel=web|linux|app</code>, <code>since</code>, <code>source</code>.</td></tr>
+            <tr><td>GET</td><td><code>/api/stats</code></td><td>token if set</td><td>Dashboard snapshot. Query: <code>source</code></td></tr>
+            <tr><td>GET</td><td><code>/api/alerts</code></td><td>token if set</td><td>Query: <code>q</code>, <code>severity</code>, <code>ip</code>, <code>source</code>, <code>since</code> (Go duration), <code>limit</code></td></tr>
+            <tr><td>GET</td><td><code>/api/events</code></td><td>token if set</td><td><code>q</code>, <code>ip</code>, <code>source</code>, <code>limit</code></td></tr>
+            <tr><td>GET</td><td><code>/api/attackers</code></td><td>token if set</td><td><code>since</code>, <code>limit</code>, <code>source</code></td></tr>
+            <tr><td>GET</td><td><code>/api/rules</code></td><td>token if set</td><td>Loaded rule metadata (no regex text)</td></tr>
+            <tr><td>GET</td><td><code>/api/stream</code></td><td>token if set</td><td>SSE. Events: <code>ping</code>, <code>alert</code></td></tr>
+            <tr><td>POST</td><td><code>/api/ingest</code></td><td>token if set</td><td>Plain lines, JSON string array, one Event, or Event batch. Header <code>X-SIEM-Source</code>.</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          Token: <code>Authorization: Bearer SECRET</code> or <code>?token=SECRET</code>.
+          Empty <code>--token</code> means the API is open to anyone who can reach the bind address.
+        </p>
+      </section>
+
+      <section class="block">
+        <h2>Ingest examples</h2>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>curl -s http://127.0.0.1:8787/api/health
+
+curl -sH "Authorization: Bearer SECRET" ^
+  --data-binary @access.log ^
+  -H "X-SIEM-Source: edge-nginx" ^
+  http://127.0.0.1:8787/api/ingest</code></pre>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 08 · next: <a href="09-agent-and-hosts.html">09 · Agent &amp; hosts</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

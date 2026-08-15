@@ -1,0 +1,17 @@
+/gpewebdefender
+/gpewebdefender.exe
+/gpewebdefender-linux-amd64
+/gpewebdefender.db
+/gpewebdefender.db-wal
+/gpewebdefender.db-shm
+/gpewebdefender-demo.db
+/gpewebdefender-demo.db-wal
+/gpewebdefender-demo.db-shm
+*.exe
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+.deploy_*.py
+.env
+/etc-local/

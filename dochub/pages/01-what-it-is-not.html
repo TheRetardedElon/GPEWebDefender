@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>01 · What it is not — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>01 · What it is not</h1>
+        <p class="lead">
+          Boundary chapter. If a feature is not in this table as “ours,” do not assume it.
+          This is how we avoid becoming Wazuh by accident.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill risk">Not OSSEC source</span>
+          <span class="pill warn">Not a WAF</span>
+        </div>
+      </header>
+
+      <section class="block">
+        <h2>Not these products</h2>
+        <table>
+          <thead><tr><th>Not</th><th>Why people think it is</th><th>Reality</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>OSSEC</strong></td>
+              <td>We started the conversation on <code>github.com/ossec/ossec-hids</code>.</td>
+              <td>Zero OSSEC files, XML, or <code>analysisd</code>. New Go program.</td>
+            </tr>
+            <tr>
+              <td><strong>Wazuh</strong></td>
+              <td>Wazuh is the OSSEC fork people actually deploy.</td>
+              <td>We refused OpenSearch and the Java indexer on purpose.</td>
+            </tr>
+            <tr>
+              <td><strong>A WAF</strong></td>
+              <td>It talks about SQLi and XSS.</td>
+              <td>It does not sit in the request path. It cannot block. It pages you after the log line exists.</td>
+            </tr>
+            <tr>
+              <td><strong>A full SIEM</strong></td>
+              <td>The repo is named SIEM.</td>
+              <td>No FIM, no rootkit, no Windows Event Log, no cases/IR workflow, no threat-intel feed.</td>
+            </tr>
+            <tr>
+              <td><strong>CrowdSec / fail2ban</strong></td>
+              <td>It notices brute force.</td>
+              <td>No bouncer. No iptables. Export a blocklist later maybe — not today.</td>
+            </tr>
+            <tr>
+              <td><strong>Grafana / Kibana</strong></td>
+              <td>There is a dashboard.</td>
+              <td>One embedded HTML page. Not a charting platform.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block">
+        <h2>Not these capabilities (v0.1)</h2>
+        <table>
+          <thead><tr><th>Capability</th><th>Status</th><th>Where it would live if we add it</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>POST body inspection</td>
+              <td><span class="status open"></span> No</td>
+              <td>Would require app/WAF audit logs. Do not dump bodies into access.log (PCI).</td>
+            </tr>
+            <tr>
+              <td>File integrity monitoring</td>
+              <td><span class="status open"></span> No</td>
+              <td>Agent rewrite. Not this product slice.</td>
+            </tr>
+            <tr>
+              <td>SSH / auth.log</td>
+              <td><span class="status live"></span> Limited</td>
+              <td>sshd / sudo / PAM / console only. Not a general syslog SIEM. See <a href="16-reports-and-auth.html">16</a>.</td>
+            </tr>
+            <tr>
+              <td>Active block (iptables / nft)</td>
+              <td><span class="status open"></span> No</td>
+              <td>Response chapter. Monitor first.</td>
+            </tr>
+            <tr>
+              <td>Cloudflare / WAF log ingest</td>
+              <td><span class="status open"></span> No</td>
+              <td><a href="12-roadmap.html">12 · Roadmap</a></td>
+            </tr>
+            <tr>
+              <td>GeoIP</td>
+              <td><span class="status open"></span> No</td>
+              <td>Needs a MaxMind (or similar) DB. Optional later.</td>
+            </tr>
+            <tr>
+              <td>LLM “SOC analyst”</td>
+              <td><span class="status open"></span> No</td>
+              <td>Not until the sensor is boring and trusted.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>Name trap</strong>
+          Calling it a SIEM in the folder is fine. Selling it as Splunk/Wazuh is not.
+          Internally: “web-attack monitor.” Externally: same words, unless we grow the product.
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>What we will not add “just because”</h2>
+        <ul>
+          <li>OpenSearch / Elasticsearch / Graylog as a dependency.</li>
+          <li>A JVM for any reason.</li>
+          <li>Logging request bodies that might contain PAN, passwords, or gift-card PINs.</li>
+          <li>A public UI with no token on a product host.</li>
+        </ul>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 01 · next: <a href="02-architecture.html">02 · Architecture</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

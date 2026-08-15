@@ -1,0 +1,237 @@
+# GPEWebDefender — web-attack rules.
+# Matched against url-decoded path+query (and UA where noted).
+# These see what access logs see: URLs, methods, status, UA — not POST bodies.
+
+rules:
+  # --- Injection -----------------------------------------------------------
+  - id: web.sqli.union
+    title: SQL injection (UNION SELECT)
+    severity: high
+    category: sqli
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i)union(\s+all)?\s+select'
+
+  - id: web.sqli.boolean
+    title: SQL injection (boolean / tautology)
+    severity: high
+    category: sqli
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: "(?i)('|\")\\s*(or|and)\\s+('|\")?\\s*\\d+\\s*=\\s*\\d+|\\bor\\s+1\\s*=\\s*1\\b|\\band\\s+1\\s*=\\s*1\\b|'\\s*or\\s*'[^']*'\\s*=\\s*'|'\\s*or\\s+sleep\\s*\\("
+
+  - id: web.sqli.time
+    title: SQL injection (time-based)
+    severity: high
+    category: sqli
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i)(sleep\s*\(\s*\d+|benchmark\s*\(|waitfor\s+delay|pg_sleep\s*\(|dbms_pipe\.receive_message)'
+
+  - id: web.sqli.schema
+    title: SQL injection (schema / file recon)
+    severity: high
+    category: sqli
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i)(information_schema|sysdatabases|load_file\s*\(|into\s+(out|dump)file|extractvalue\s*\(|updatexml\s*\(|xp_cmdshell)'
+
+  - id: web.sqli.stacked
+    title: SQL injection (stacked / destructive)
+    severity: critical
+    category: sqli
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i);\s*(drop|truncate|alter|shutdown|insert|update|delete)\s'
+
+  - id: web.xss.script
+    title: XSS (script / event handler)
+    severity: high
+    category: xss
+    mitre: [T1190, T1189]
+    fields: [decoded]
+    pattern: '(?i)(<script[\s>]|javascript:|vbscript:|on(error|load|click|mouseover|focus|toggle)\s*=|<iframe[\s>]|<svg[\s/]|document\.cookie|document\.location)'
+    not_pattern: '(?i)\.(css|js|png|jpg|jpeg|gif|svg|woff2?)(\?|$)'
+
+  - id: web.traversal
+    title: Path traversal
+    severity: high
+    category: traversal
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i)(\.\./|\.\.\\|/etc/passwd|/etc/shadow|/windows/win\.ini|/proc/self|/winnt/|/boot\.ini)'
+
+  - id: web.php.filter
+    title: PHP wrapper / filter RCE probe
+    severity: critical
+    category: rce
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i)(php://(filter|input|fd)|data://text|expect://|phar://|zip://)'
+
+  - id: web.cmdi
+    title: Command injection in URL
+    severity: critical
+    category: cmdi
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i)(;|\||`|\$\(|&&)\s*(wget|curl|nc|ncat|bash|sh|zsh|powershell|cmd\.exe|python|perl|chmod|cat\s+/etc)'
+
+  - id: web.ssti
+    title: Template injection (SSTI)
+    severity: high
+    category: ssti
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(\{\{.*\d+\s*[\*/]\s*\d+.*\}\}|\$\{[^}]*\d+\s*[\*/]|<%=.+%>|\{%|\{\{config|\{\{self|__class__|__globals__)'
+
+  - id: web.ssrf.metadata
+    title: SSRF to cloud metadata
+    severity: critical
+    category: ssrf
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i)(169\.254\.169\.254|metadata\.google\.internal|fd00:ec2::254|latest/meta-data|latest/user-data)'
+
+  - id: web.crlf
+    title: CRLF / header injection
+    severity: medium
+    category: injection
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(%0d%0a|%0a%0d|\r\n)[^\s]*\s*(set-cookie|location|content-type):'
+
+  - id: web.log4shell
+    title: Log4Shell / JNDI lookup
+    severity: critical
+    category: rce
+    mitre: [T1190]
+    fields: [decoded, ua, referer, raw]
+    pattern: '(?i)\$\{jndi:(ldap|rmi|dns|nis|iiop|nds|corba):'
+
+  - id: web.spring4shell
+    title: Spring4Shell class-loader probe
+    severity: critical
+    category: rce
+    mitre: [T1190]
+    fields: [decoded]
+    pattern: '(?i)class\.module\.classLoader|spring\.cloud\.function\.routing-expression'
+
+  # --- Sensitive path / recon ---------------------------------------------
+  - id: web.recon.env
+    title: Secret file probe (.env / credentials)
+    severity: high
+    category: recon
+    mitre: [T1595.003]
+    fields: [decoded]
+    pattern: '(?i)(/\.env(?:\.|$)|/\.env\.(local|prod|production|staging|dev)|/\.aws/credentials|/appsettings\.[^/]*json|/id_rsa|/id_ed25519|\.htpasswd)'
+
+  - id: web.recon.git
+    title: Source-control probe (.git / .svn)
+    severity: high
+    category: recon
+    mitre: [T1595.003]
+    fields: [path]
+    pattern: '(?i)(/\.(git|svn|hg)(/|$)|/\.git/HEAD|/\.git/config)'
+
+  - id: web.recon.backup
+    title: Backup / dump file probe
+    severity: medium
+    category: recon
+    mitre: [T1595.003]
+    fields: [path]
+    pattern: '(?i)\.(sql|tar|tar\.gz|tgz|zip|rar|7z|bak|old|swp|orig)(\?|$)|/(backup|dump|db_backup|site\.sql)'
+
+  - id: web.recon.debug
+    title: Debug / actuator / server-status probe
+    severity: medium
+    category: recon
+    mitre: [T1595.002]
+    fields: [path]
+    pattern: '(?i)(/server-status|/server-info|/phpinfo|/actuator(/|$)|/heapdump|/jolokia|/console|/debug/default|/telescope|/horizon|/\_profiler|/wp-json/wp/v2/users)'
+
+  - id: web.recon.admin
+    title: Admin / panel hunting
+    severity: low
+    category: recon
+    mitre: [T1595.002]
+    fields: [path]
+    pattern: '(?i)^/(phpmyadmin|pma|adminer|wp-admin|wp-login\.php|xmlrpc\.php|administrator|manager/html|solr/|/jmx-console)'
+
+  - id: web.recon.cms
+    title: CMS / framework exploit path
+    severity: medium
+    category: recon
+    mitre: [T1190]
+    fields: [path]
+    pattern: '(?i)(/vendor/phpunit|/cgi-bin/|/scripts/setup\.php|/wp-content/uploads/.*\.php|/autoload_classmap|/typo3|/magento|/xmlrpc|/solr/admin)'
+
+  - id: web.method.unusual
+    title: Unusual HTTP method
+    severity: low
+    category: recon
+    mitre: [T1190]
+    fields: [method]
+    pattern: '^(TRACE|TRACK|DEBUG|CONNECT|PROPFIND|MOVE|COPY)$'
+
+  # --- Scanners -----------------------------------------------------------
+  - id: web.scanner.ua
+    title: Known vulnerability scanner
+    severity: medium
+    category: scanner
+    mitre: [T1595]
+    fields: [ua]
+    pattern: '(?i)(sqlmap|nikto|nuclei|nmap|masscan|zgrab|dirbuster|gobuster|ffuf|wfuzz|wpscan|acunetix|nessus|openvas|nikto|whatweb|httpx|katana|feroxbuster|dirsearch|w3af|skipfish|burp(?:suite)?|owasp\s*zap|qualys|netsparker|invicti|openvas|masscan)'
+
+  - id: web.scanner.exploitdb
+    title: Exploit-kit / scripted attacker UA
+    severity: medium
+    category: scanner
+    mitre: [T1595]
+    fields: [ua]
+    pattern: '(?i)(havij|pangolin|sql power injector|libwww-perl|zmeu|morfeus)'
+
+  # --- Behavioral (thresholds) --------------------------------------------
+  - id: web.scan.404storm
+    title: Directory busting (404 storm)
+    severity: medium
+    category: scanner
+    mitre: [T1595.003]
+    kind: threshold
+    group_by: src_ip
+    status: [404]
+    count: 25
+    window: 60s
+
+  - id: web.scan.403storm
+    title: Auth-wall hammering (401/403 storm)
+    severity: medium
+    category: brute
+    mitre: [T1110]
+    kind: threshold
+    group_by: src_ip
+    status: [401, 403]
+    count: 15
+    window: 60s
+
+  - id: web.brute.login
+    title: Web login brute force
+    severity: high
+    category: brute
+    mitre: [T1110]
+    kind: threshold
+    group_by: src_ip
+    methods: [POST]
+    path_contains: [/login, /signin, /sign-in, /auth, /session, /wp-login, /api/auth, /api/login, /admin]
+    count: 8
+    window: 60s
+
+  - id: web.flood.ip
+    title: Single-IP request flood
+    severity: medium
+    category: dos
+    mitre: [T1498]
+    kind: threshold
+    group_by: src_ip
+    count: 200
+    window: 10s

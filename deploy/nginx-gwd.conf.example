@@ -1,0 +1,41 @@
+# HTTPS front door for the UI + docs.
+# 1. Copy to sites-available, set YOUR_HOSTNAME
+# 2. Put the ingest token in /etc/nginx/gwd-bearer.inc (not in git):
+#      proxy_set_header Authorization "Bearer YOUR_TOKEN";
+# 3. certbot --nginx -d YOUR_HOSTNAME
+# 4. Agents do NOT use this vhost for ingest.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name YOUR_HOSTNAME;
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name YOUR_HOSTNAME;
+
+    # ssl_certificate …  (certbot fills this)
+
+    auth_basic "GPEWebDefender";
+    auth_basic_user_file /etc/nginx/.htpasswd-gwd;
+
+    location = /api/ingest {
+        deny all;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        include /etc/nginx/gwd-bearer.inc;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+    }
+}

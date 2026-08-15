@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>03 · Install &amp; run — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>03 · Install &amp; run</h1>
+        <p class="lead">
+          Native on Windows and Linux. Same source. No runtime other than the OS.
+          Go 1.22+ to build; the binary itself needs nothing.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">Windows amd64</span>
+          <span class="pill">Linux amd64</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#build">Build</a>
+        <a href="#first">First run</a>
+        <a href="#flags">Flags</a>
+        <a href="#cross">Cross-compile</a>
+      </nav>
+
+      <section class="block" id="build">
+        <h2>Build</h2>
+        <p class="hint">From the repo root.</p>
+        <table>
+          <thead><tr><th>Host</th><th>Command</th><th>Output</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Windows</td>
+              <td><code>go build -o gpewebdefender.exe .\cmd\gpewebdefender</code></td>
+              <td><code>gpewebdefender.exe</code></td>
+            </tr>
+            <tr>
+              <td>Linux</td>
+              <td><code>go build -o gpewebdefender ./cmd/gpewebdefender</code></td>
+              <td><code>gpewebdefender</code></td>
+            </tr>
+            <tr>
+              <td>Windows → Linux</td>
+              <td><code>set GOOS=linux</code> · <code>set GOARCH=amd64</code> · <code>set CGO_ENABLED=0</code> · same <code>go build</code></td>
+              <td><code>gpewebdefender-linux-amd64</code> (~16 MB)</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout good">
+          <strong>CGO is off on purpose</strong>
+          SQLite is the pure-Go port. You do not need gcc on the build box or on the server.
+        </div>
+      </section>
+
+      <section class="block" id="first">
+        <h2>First run</h2>
+        <table>
+          <thead><tr><th>Intent</th><th>Command</th><th>Then</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>See the UI with fake attacks</td>
+              <td><code>gpewebdefender demo</code></td>
+              <td>Open http://127.0.0.1:8787 — this is <strong>not</strong> your server.</td>
+            </tr>
+            <tr>
+              <td>Watch a real log (this box)</td>
+              <td><code>gpewebdefender serve --tail C:\logs\access.log</code><br/>or <code>--tail /var/log/nginx/access.log</code></td>
+              <td>Same UI. Source column is the file name.</td>
+            </tr>
+            <tr>
+              <td>Watch from another host</td>
+              <td>Manager: <code>serve --token SECRET --listen 127.0.0.1:8787</code><br/>Remote: <code>agent --url http://siem:8787 --token SECRET --tail …</code></td>
+              <td><a href="09-agent-and-hosts.html">09</a></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>Default bind</strong>
+          <code>--listen</code> defaults to <code>127.0.0.1:8787</code>. Only this machine can open the UI.
+          That is correct until you put a gate in front of it. See <a href="10-deploy-on-gpe.html">10</a>.
+        </div>
+      </section>
+
+      <section class="block" id="flags">
+        <h2>Flags</h2>
+        <h3>serve</h3>
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--listen</code></td><td><code>127.0.0.1:8787</code></td><td>UI + API bind</td></tr>
+            <tr><td><code>--db</code></td><td><code>gpewebdefender.db</code></td><td>SQLite path (WAL files appear beside it)</td></tr>
+            <tr><td><code>--tail</code></td><td>empty</td><td>Access log(s), comma-separated</td></tr>
+            <tr><td><code>--journal</code></td><td>false</td><td>Follow systemd journal for sshd/sudo/login (Debian without <code>auth.log</code>)</td></tr>
+            <tr><td><code>--from-start</code></td><td>false</td><td>Replay existing lines, not only new appends</td></tr>
+            <tr><td><code>--rules</code></td><td>empty</td><td>Extra YAML file or directory (built-in always loads)</td></tr>
+            <tr><td><code>--token</code></td><td>empty</td><td>Bearer / <code>?token=</code> required on <code>/api/*</code> except health</td></tr>
+            <tr><td><code>--retain</code></td><td><code>168h</code></td><td>Raw event retention</td></tr>
+            <tr><td><code>--home</code></td><td><code>US</code></td><td>Default map pin: ISO country or <code>lat,lon</code></td></tr>
+            <tr><td><code>--homes</code></td><td>empty</td><td>Named pins: <code>name=lat,lon;name=ISO</code>. <code>name</code> matches agent <code>--name</code></td></tr>
+            <tr><td><code>--geoip</code></td><td>empty</td><td>Optional MaxMind/DB-IP <code>.mmdb</code> for real client IPs</td></tr>
+            <tr><td><code>--docs</code></td><td><code>./dochub</code> if present</td><td>DocHub at <code>/docs/</code></td></tr>
+          </tbody>
+        </table>
+        <h3>demo</h3>
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--listen</code></td><td><code>127.0.0.1:8787</code></td><td>UI bind</td></tr>
+            <tr><td><code>--db</code></td><td><code>gpewebdefender-demo.db</code></td><td>Separate file so demo never pollutes live</td></tr>
+            <tr><td><code>--every</code></td><td><code>900ms</code></td><td>Interval between invented requests</td></tr>
+          </tbody>
+        </table>
+        <h3>agent</h3>
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--url</code></td><td>required</td><td>Manager base URL</td></tr>
+            <tr><td><code>--tail</code></td><td>required</td><td>Log path(s), comma-separated</td></tr>
+            <tr><td><code>--token</code></td><td>empty</td><td>Must match manager <code>--token</code></td></tr>
+            <tr><td><code>--name</code></td><td>hostname</td><td><code>X-SIEM-Source</code> header</td></tr>
+            <tr><td><code>--from-start</code></td><td>false</td><td>Ship historical lines too</td></tr>
+            <tr><td><code>--journal</code></td><td>false</td><td>Follow journald sshd/sudo. Can replace <code>--tail /var/log/auth.log</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="cross">
+        <h2>Cross-compile from Windows (PowerShell)</h2>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>$env:GOOS="linux"
+$env:GOARCH="amd64"
+$env:CGO_ENABLED="0"
+go build -o gpewebdefender-linux-amd64 .\cmd\gpewebdefender</code></pre>
+        <p class="hint">Copy the file to the Linux box, <code>chmod +x</code>, run. No Go install required on the server.</p>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 03 · next: <a href="04-demo-vs-live.html">04 · Demo vs live</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

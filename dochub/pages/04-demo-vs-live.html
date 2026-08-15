@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>04 · Demo vs live — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>04 · Demo vs live</h1>
+        <p class="lead">
+          The dashboard you opened first was a simulator. This chapter is the permanent reminder
+          so nobody pages the team over a fake sqlmap hit.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill warn">Demo never touches GPE</span>
+        </div>
+      </header>
+
+      <section class="block">
+        <h2>How to tell</h2>
+        <table>
+          <thead><tr><th></th><th>Demo</th><th>Live</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Command</strong></td>
+              <td><code>gpewebdefender demo</code></td>
+              <td><code>gpewebdefender serve --tail …</code> or <code>agent</code></td>
+            </tr>
+            <tr>
+              <td><strong>DB file</strong></td>
+              <td><code>gpewebdefender-demo.db</code></td>
+              <td><code>gpewebdefender.db</code> (unless you override <code>--db</code>)</td>
+            </tr>
+            <tr>
+              <td><strong>Source column</strong></td>
+              <td><code>demo</code></td>
+              <td>Log file base name, or agent <code>--name</code></td>
+            </tr>
+            <tr>
+              <td><strong>IPs</strong></td>
+              <td>Hard-coded lab ranges (185.220…, 45.155…, 10.0.4.22, …)</td>
+              <td>Whatever nginx wrote</td>
+            </tr>
+            <tr>
+              <td><strong>Network</strong></td>
+              <td>None. <code>internal/demo</code> formats strings in-process.</td>
+              <td>Reads a file. Agent POSTs to the manager. Still no outbound scan of your site.</td>
+            </tr>
+            <tr>
+              <td><strong>Startup log</strong></td>
+              <td><code>DEMO mode — simulated web attacks on http://…</code></td>
+              <td><code>web attack monitor on http://… (N rules)</code> + <code>tailing …</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout risk">
+          <strong>Demo is not a load test of the real site</strong>
+          It does not issue HTTP to any host.
+          If you want to see real internet noise, point <code>--tail</code> at a real access log.
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>What demo invents</h2>
+        <p class="hint">Code: <code>internal/demo/demo.go</code>. Mix of clean site paths and classic probes.</p>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart LR
+  D[demo.Run ticker] --> C{1 in 5 clean?}
+  C -->|yes| OK["/ · /menu · /assets/app.css · POST /api/orders"]
+  C -->|no| ATK["SQLi · traversal · .env · Log4Shell · SSRF · wp-admin"]
+  D --> B[startup burst]
+  B --> F404["30 × 404 from 45.83.12.9"]
+  B --> BRUTE["10 × POST /api/auth/login"]
+          </pre>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>Going live without mixing files</h2>
+        <ol>
+          <li>Stop demo (Ctrl+C).</li>
+          <li>Do not reuse <code>gpewebdefender-demo.db</code> as the live DB.</li>
+          <li><code>gpewebdefender serve --tail /var/log/nginx/access.log --db /var/lib/gpewebdefender/gpewebdefender.db</code></li>
+          <li>Confirm source is the file name, not <code>demo</code>.</li>
+        </ol>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 04 · next: <a href="05-log-formats.html">05 · Log formats</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

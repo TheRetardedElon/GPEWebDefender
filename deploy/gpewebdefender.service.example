@@ -1,0 +1,20 @@
+# Manager unit. Copy to /etc/systemd/system/gpewebdefender.service
+# Fill /etc/gpewebdefender/env on the box. Do not commit real tokens.
+
+[Unit]
+Description=gpewebdefender web-attack monitor
+After=network.target
+
+[Service]
+Type=simple
+User=gpewebdefender
+Group=gpewebdefender
+WorkingDirectory=/var/lib/gpewebdefender
+EnvironmentFile=/etc/gpewebdefender/env
+ExecStart=/usr/local/bin/gpewebdefender serve --listen 127.0.0.1:8787 --db /var/lib/gpewebdefender/gpewebdefender.db --home 40.7,-74.0 --homes ${GWD_HOMES} --token ${GWD_TOKEN} --retain 168h
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

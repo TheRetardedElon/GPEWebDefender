@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>GPEWebDefender — DocHub</title>
+  <meta name="description" content="Web-attack monitor: hierarchy, flows, and operating truth." />
+  <link rel="stylesheet" href="css/dochub.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body data-base=".">
+  <button type="button" class="nav-toggle" aria-label="Menu">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav" aria-label="SIEM DocHub"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>GPEWebDefender — DocHub</h1>
+        <p class="lead">
+          A complete visual hierarchy of the web-attack monitor.
+          Use this to run it, extend rules, and not confuse demo noise with a live box.
+        </p>
+        <div class="meta-row">
+          <span class="pill live"><strong>Product</strong> web-attack monitor</span>
+          <span class="pill"><strong>Version</strong> 0.3.0</span>
+          <span class="pill warn"><strong>Not</strong> OSSEC source</span>
+          <span class="pill">Chapters 00–16</span>
+          <span class="pill">Updated <span data-generated>2026-08-14</span></span>
+        </div>
+      </header>
+
+      <div class="callout info">
+        <strong>How to use this site</strong>
+        Read top-down: what it is → what it is not → architecture → install.
+        Then <a href="pages/04-demo-vs-live.html"><strong>04 · Demo vs live</strong></a>
+        before you ever trust a dashboard. Detection depth is
+        <a href="pages/06-detection-engine.html"><strong>06</strong></a> +
+        <a href="pages/07-rule-catalog.html"><strong>07</strong></a>.
+        Putting it on a server is <a href="pages/10-deploy.html"><strong>10</strong></a>.
+      </div>
+      <div class="callout good">
+        <strong>Status (2026-08-14)</strong>
+        v0.1.0: one Go binary, <strong>41 rules</strong> (injection, recon, snoop, canary, modern probes),
+        SQLite, live UI, color-filtered attack map, Windows + Linux.
+        Comfortable on a dedicated <strong>2 CPU / 2 GB</strong> box.
+        Demo is fake. Live traffic starts when an agent (or <code>--tail</code>) ships a real access log.
+        This DocHub is also served from the manager at <code>/docs/</code>.
+      </div>
+
+      <section class="block">
+        <h2>One-page system picture</h2>
+        <p class="hint">Outside → inside. The monitor sits <em>next to</em> the site. If it dies, the web server keeps serving.</p>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart TB
+  subgraph WEB["1 · Web hosts"]
+    NGX["nginx / Caddy / app<br/>access.log"]
+  end
+
+  subgraph SHIP["2 · Ship"]
+    TAIL["gpewebdefender serve --tail<br/>same box"]
+    AGT["gpewebdefender agent<br/>other boxes"]
+  end
+
+  subgraph MON["3 · Monitor"]
+    PARSE["parse combined / JSON"]
+    DET["detect · YAML rules"]
+    DB[("SQLite<br/>events + alerts")]
+    UI["UI :8787 + SSE"]
+  end
+
+  NGX --> TAIL
+  NGX --> AGT
+  TAIL --> PARSE
+  AGT -->|POST /api/ingest| PARSE
+  PARSE --> DET
+  DET --> DB
+  DET --> UI
+          </pre>
+        </div>
+        <p class="diagram-caption">Canonical path: access log → parse → rules → SQLite + live UI. No JVM. No OpenSearch. Not in the request path.</p>
+      </section>
+
+      <section class="block">
+        <h2>Chapter map</h2>
+        <p class="hint">Work through these in order the first time. After that, jump via the sidebar.</p>
+        <div class="grid grid-2">
+          <a class="card" href="pages/00-what-this-is.html">
+            <div class="num">00</div>
+            <h3>What this is</h3>
+            <p>One-sentence product, why we built it, non-negotiable truths.</p>
+            <div class="tags"><span class="tag core">start</span></div>
+          </a>
+          <a class="card" href="pages/01-what-it-is-not.html">
+            <div class="num">01</div>
+            <h3>What it is not</h3>
+            <p>Not OSSEC, not Wazuh, not a WAF, not a full SOC. Steal the job, not the code.</p>
+            <div class="tags"><span class="tag risk">honesty</span></div>
+          </a>
+          <a class="card" href="pages/02-architecture.html">
+            <div class="num">02</div>
+            <h3>Architecture</h3>
+            <p>Packages, pipeline, store, how a line becomes an alert.</p>
+            <div class="tags"><span class="tag core">code</span></div>
+          </a>
+          <a class="card" href="pages/03-install-and-run.html">
+            <div class="num">03</div>
+            <h3>Install &amp; run</h3>
+            <p>Windows + Linux binaries, flags, first command.</p>
+            <div class="tags"><span class="tag core">ops</span></div>
+          </a>
+          <a class="card" href="pages/04-demo-vs-live.html">
+            <div class="num">04</div>
+            <h3>Demo vs live</h3>
+            <p>Fake IPs vs a real access.log. How to know which you are looking at.</p>
+            <div class="tags"><span class="tag gap">read first</span></div>
+          </a>
+          <a class="card" href="pages/05-log-formats.html">
+            <div class="num">05</div>
+            <h3>Log formats</h3>
+            <p>Combined, vhost_combined, nginx/Caddy/Traefik JSON.</p>
+            <div class="tags"><span class="tag ok">parsers</span></div>
+          </a>
+          <a class="card" href="pages/06-detection-engine.html">
+            <div class="num">06</div>
+            <h3>Detection engine</h3>
+            <p>Pattern vs threshold, YAML schema, double-decode, extra rules.</p>
+            <div class="tags"><span class="tag core">brain</span></div>
+          </a>
+          <a class="card" href="pages/07-rule-catalog.html">
+            <div class="num">07</div>
+            <h3>Rule catalog</h3>
+            <p>All 27 built-in rules with severity, category, MITRE.</p>
+            <div class="tags"><span class="tag core">content</span></div>
+          </a>
+          <a class="card" href="pages/08-ui-and-api.html">
+            <div class="num">08</div>
+            <h3>UI &amp; API</h3>
+            <p>Dashboard, SSE stream, ingest, token, health.</p>
+          </a>
+          <a class="card" href="pages/09-agent-and-hosts.html">
+            <div class="num">09</div>
+            <h3>Agent &amp; hosts</h3>
+            <p>Ship logs from another box. Batch, token, source name.</p>
+          </a>
+          <a class="card" href="pages/10-deploy.html">
+            <div class="num">10</div>
+            <h3>Deploy</h3>
+            <p>Suggested topology. systemd. Bind localhost.</p>
+            <div class="tags"><span class="tag live">ops</span></div>
+          </a>
+          <a class="card" href="pages/11-limits-and-honesty.html">
+            <div class="num">11</div>
+            <h3>Limits &amp; honesty</h3>
+            <p>POST bodies, false positives, resource targets, what we will not add.</p>
+            <div class="tags"><span class="tag gap">ceiling</span></div>
+          </a>
+          <a class="card" href="pages/12-roadmap.html">
+            <div class="num">12</div>
+            <h3>Roadmap</h3>
+            <p>Site-specific rules, TLS ingest, next slices. Living backlog.</p>
+            <div class="tags"><span class="tag gap">backlog</span></div>
+          </a>
+          <a class="card" href="pages/13-attack-map.html">
+            <div class="num">13</div>
+            <h3>Attack map</h3>
+            <p>Live arcs, home pin, optional GeoIP MMDB. Same feed as alerts.</p>
+            <div class="tags"><span class="tag live">map</span></div>
+          </a>
+          <a class="card" href="pages/14-snoop-and-canaries.html">
+            <div class="num">14</div>
+            <h3>Snoop &amp; canaries</h3>
+            <p>Human-paced 404 walks, modern secret/API probes, trap paths.</p>
+            <div class="tags"><span class="tag core">behavior</span></div>
+          </a>
+          <a class="card" href="pages/15-production-edge.html">
+            <div class="num">15</div>
+            <h3>Production edge</h3>
+            <p>HTTPS UI, agents, GeoIP, all knobs in env/flags — nothing host-specific in the repo.</p>
+            <div class="tags"><span class="tag live">config</span></div>
+          </a>
+          <a class="card" href="pages/16-reports-and-auth.html">
+            <div class="num">16</div>
+            <h3>Reports &amp; auth</h3>
+            <p>Vector mix, web 401/403, Linux sshd, application login JSON ingest.</p>
+            <div class="tags"><span class="tag live">reports</span></div>
+          </a>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>Non-negotiable design truths</h2>
+        <table>
+          <thead>
+            <tr><th>Truth</th><th>Implication</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Out of band</strong></td>
+              <td>We tail logs. We do not proxy HTTP. A crash here cannot take the site down.</td>
+            </tr>
+            <tr>
+              <td><strong>Access logs are the sensor</strong></td>
+              <td>URL, method, status, UA, IP. Not POST bodies. Do not start logging card fields to “see more.”</td>
+            </tr>
+            <tr>
+              <td><strong>No Java pile</strong></td>
+              <td>One Go binary + SQLite. We do not add OpenSearch, Elasticsearch, or Wazuh “just for search.”</td>
+            </tr>
+            <tr>
+              <td><strong>Not OSSEC source</strong></td>
+              <td>We stole the <em>job</em> (see web attacks cheaply). We did not fork OSSEC or Wazuh.</td>
+            </tr>
+            <tr>
+              <td><strong>Demo is fake</strong></td>
+              <td><code>gpewebdefender demo</code> invents lines. It never talks to your site.</td>
+            </tr>
+            <tr>
+              <td><strong>Bind localhost until you mean it</strong></td>
+              <td>Default listen is <code>127.0.0.1:8787</code>. Do not put the UI on the public internet without a token and a gate.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="foot">
+        GPEWebDefender DocHub · chapters 00–16 · configure your own hosts. Nothing inventory-specific in this tree.
+        Not OSSEC. Not a WAF. Develop carefully.
+      </footer>
+    </main>
+  </div>
+  <script src="js/nav.js"></script>
+  <script src="js/dochub.js"></script>
+</body>
+</html>

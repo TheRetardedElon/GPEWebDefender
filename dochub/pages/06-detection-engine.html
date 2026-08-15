@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>06 · Detection engine — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>06 · Detection engine</h1>
+        <p class="lead">
+          YAML in, compiled regex + optional sliding window out.
+          Code: <code>internal/detect</code>. Content: <code>rules/web.yaml</code> (also embedded).
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">pattern + threshold</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#kinds">Kinds</a>
+        <a href="#schema">YAML schema</a>
+        <a href="#load">Load order</a>
+        <a href="#extra">Your rules</a>
+      </nav>
+
+      <section class="block" id="kinds">
+        <h2>Two kinds</h2>
+        <table>
+          <thead><tr><th>kind</th><th>Fires when</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>pattern</code> (default)</td>
+              <td>Any listed field matches the regex (after pre-filters).</td>
+              <td><code>web.sqli.union</code> on decoded URL</td>
+            </tr>
+            <tr>
+              <td><code>threshold</code></td>
+              <td>N matching events from the same <code>group_by</code> key inside <code>window</code>. Then the window resets so we do not alert every extra hit.</td>
+              <td>25 × 404 from one IP in 60s → <code>web.scan.404storm</code></td>
+            </tr>
+            <tr>
+              <td><code>snoop</code></td>
+              <td>Distinct interesting paths, human-paced gaps (<code>min_gap</code>), optional empty referer and low static-asset ratio.</td>
+              <td>Slow <code>/admin</code> → <code>/.env</code> walk → <code>web.snoop.secret_hunt</code>. See <a href="14-snoop-and-canaries.html">14</a>.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout info">
+          <strong>One event, many alerts</strong>
+          A sqlmap GET with <code>UNION SELECT</code> can fire both <code>web.scanner.ua</code> and
+          <code>web.sqli.union</code>. That is intended. Filter the UI by severity if the feed is loud.
+        </div>
+      </section>
+
+      <section class="block" id="schema">
+        <h2>YAML schema</h2>
+        <table>
+          <thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>yes</td><td>Stable, dotted. Do not recycle.</td></tr>
+            <tr><td><code>title</code></td><td>yes</td><td>What the UI shows.</td></tr>
+            <tr><td><code>severity</code></td><td>no</td><td><code>critical</code> · <code>high</code> · <code>medium</code> · <code>low</code>. Default medium.</td></tr>
+            <tr><td><code>category</code></td><td>no</td><td>sqli, xss, recon, scanner, brute, …</td></tr>
+            <tr><td><code>mitre</code></td><td>no</td><td>List of technique IDs.</td></tr>
+            <tr><td><code>fields</code></td><td>no</td><td>Where to run the regex. Default <code>decoded</code>, <code>ua</code>.</td></tr>
+            <tr><td><code>pattern</code> / <code>patterns</code></td><td>pattern rules</td><td>OR’d together. Keep them ReDoS-boring — no nested <code>.*</code> bombs.</td></tr>
+            <tr><td><code>not_pattern</code></td><td>no</td><td>Suppress if this also matches (XSS vs <code>.js</code> assets).</td></tr>
+            <tr><td><code>methods</code></td><td>no</td><td>Allow-list of HTTP methods.</td></tr>
+            <tr><td><code>status</code></td><td>no</td><td>Allow-list of status codes.</td></tr>
+            <tr><td><code>path_prefix</code> / <code>path_contains</code></td><td>no</td><td>Pre-filters, case-insensitive.</td></tr>
+            <tr><td><code>kind</code></td><td>no</td><td><code>pattern</code> or <code>threshold</code>.</td></tr>
+            <tr><td><code>count</code> / <code>window</code> / <code>group_by</code></td><td>threshold</td><td>Defaults 20 / 60s / <code>src_ip</code>.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="load">
+        <h2>Load order</h2>
+        <ol>
+          <li>On-disk <code>./rules</code> or <code>&lt;exe-dir&gt;/rules</code> if that directory exists and parses.</li>
+          <li>Else the embedded copy of <code>rules/web.yaml</code>.</li>
+          <li>Then <code>--rules path</code> is <em>appended</em> (does not replace built-ins).</li>
+        </ol>
+        <p class="hint">
+          Edit <code>rules/web.yaml</code> next to the binary and restart to take effect.
+          There is no hot reload in v0.1.
+        </p>
+      </section>
+
+      <section class="block" id="extra">
+        <h2>Add a site-only rule</h2>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code># rules/local.yaml
+rules:
+  - id: site.admin.probe
+    title: Admin path probe
+    severity: medium
+    category: recon
+    mitre: [T1595.002]
+    fields: [path]
+    pattern: '(?i)^/(admin|backoffice)/'</code></pre>
+        <p>Then: <code>gpewebdefender serve --tail … --rules rules/local.yaml</code></p>
+        <div class="callout good">
+          <strong>This is the product lever</strong>
+          Generic SQLi is table stakes. Paths only <em>your</em> app has
+          are how the monitor becomes yours. Catalog those on <a href="12-roadmap.html">12</a> as you learn them.
+        </div>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 06 · next: <a href="07-rule-catalog.html">07 · Rule catalog</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

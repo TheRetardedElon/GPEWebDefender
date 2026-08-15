@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>00 · What this is — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>00 · What this is</h1>
+        <p class="lead">
+          <strong>GPEWebDefender</strong> is a <strong>web-attack monitor</strong> for any site that writes HTTP access logs.
+          It reads those logs, fires rules, and shows you who is probing the box.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill">v0.1.0</span>
+          <span class="pill">Monitor, not WAF</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav" aria-label="On this page">
+        <a href="#sentence">One sentence</a>
+        <a href="#why">Why it exists</a>
+        <a href="#job">The job</a>
+        <a href="#truths">Truths</a>
+      </nav>
+
+      <section class="block" id="sentence">
+        <h2>One sentence</h2>
+        <p>
+          Tail nginx (or Caddy, or anything that writes a combined/JSON access log),
+          match the line against a small YAML ruleset, store the hit in SQLite,
+          stream it to a local UI.
+        </p>
+        <div class="callout info">
+          <strong>Name vs job</strong>
+          The repo is named like a SIEM because that is how the work started.
+          The shipping product is narrower than a full SIEM: <em>web attacks on your sites and servers</em>.
+          Chapter <a href="01-what-it-is-not.html">01</a> is the boundary.
+        </div>
+      </section>
+
+      <section class="block" id="why">
+        <h2>Why it exists</h2>
+        <p class="hint">
+          OSSEC looked right (small, C, HIDS). Wazuh is the modern fork — and it pillages a small box
+          because of OpenSearch (Java), not because the detector itself is Java.
+        </p>
+        <table>
+          <thead><tr><th>Thing we looked at</th><th>What was true</th><th>What we did</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>OSSEC</strong></td>
+              <td>Light C HIDS. XML, 2008 UX, weak search.</td>
+              <td>Stole the <em>job</em>. Did not take the source.</td>
+            </tr>
+            <tr>
+              <td><strong>Wazuh</strong></td>
+              <td>OSSEC + OpenSearch + dashboard. RAM hog is the indexer.</td>
+              <td>Refused the Java pile.</td>
+            </tr>
+            <tr>
+              <td><strong>Vector + OpenObserve</strong></td>
+              <td>Great log pipeline. Not a SIEM. No FIM, no SOC, no web-attack content.</td>
+              <td>Did not assemble a log bucket and call it done.</td>
+            </tr>
+            <tr>
+              <td><strong>gpewebdefender</strong></td>
+              <td>Go binary + SQLite + web rules + UI.</td>
+              <td>Built this. Windows and Linux. Comfortable on 1 GB.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="job">
+        <h2>The job (v0.1)</h2>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart LR
+  L[access.log] --> P[parse]
+  P --> R{rule match?}
+  R -->|no| E[(events)]
+  R -->|yes| A[(alerts)]
+  A --> U[UI live feed]
+  E --> U
+          </pre>
+        </div>
+        <div class="layer-stack">
+          <div class="layer-strip layer-l1">
+            <span class="layer-badge">See</span>
+            <h3>Injection &amp; exploit paths</h3>
+            <p>SQLi, XSS, traversal, CMDi, SSTI, PHP wrappers, Log4Shell, Spring4Shell, metadata SSRF</p>
+          </div>
+          <div class="layer-strip layer-l2">
+            <span class="layer-badge">See</span>
+            <h3>Recon</h3>
+            <p><code>.env</code>, <code>.git</code>, backups, actuators, admin/CMS hunting, weird HTTP methods</p>
+          </div>
+          <div class="layer-strip layer-l3">
+            <span class="layer-badge">See</span>
+            <h3>Abuse</h3>
+            <p>Scanner UAs, 404 storms, 401/403 hammering, login brute, single-IP floods</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" id="truths">
+        <h2>Non-negotiable truths</h2>
+        <p class="hint">Same list as the hub home. Repeated here so this chapter stands alone.</p>
+        <table>
+          <thead><tr><th>Truth</th><th>Implication</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Out of band</strong></td>
+              <td>We do not proxy your HTTP. The site lives if we die.</td>
+            </tr>
+            <tr>
+              <td><strong>Access logs are the sensor</strong></td>
+              <td>We see what the log sees. We do not invent packet capture.</td>
+            </tr>
+            <tr>
+              <td><strong>No Java pile</strong></td>
+              <td>If search gets bigger, we pick VictoriaLogs — not OpenSearch.</td>
+            </tr>
+            <tr>
+              <td><strong>Demo is fake</strong></td>
+              <td>See <a href="04-demo-vs-live.html">04</a> before you panic at a dashboard.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 00 · next: <a href="01-what-it-is-not.html">01 · What it is not</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>
