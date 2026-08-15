@@ -1,0 +1,82 @@
+# Optional CMS pack. NOT loaded by default.
+#   gpewebdefender serve --rules packs
+#   gpewebdefender serve --rules packs/cms.yaml
+#
+# Two uses:
+#   1. You run WordPress / Drupal / Joomla — these are real attack paths.
+#   2. You do not — they become extra honey. Honest users never hit them.
+#
+# Nothing about a specific customer site belongs here.
+
+rules:
+  - id: cms.wp.login
+    title: WordPress login
+    severity: medium
+    category: brute
+    mitre: [T1110]
+    tags: [cms, wordpress]
+    fields: [path]
+    pattern: '(?i)/wp-login\.php'
+
+  - id: cms.wp.xmlrpc
+    title: WordPress xmlrpc.php
+    severity: medium
+    category: recon
+    mitre: [T1190]
+    tags: [cms, wordpress]
+    fields: [path]
+    pattern: '(?i)/xmlrpc\.php'
+
+  - id: cms.wp.users_api
+    title: WordPress user enum API
+    severity: medium
+    category: recon
+    mitre: [T1589]
+    tags: [cms, wordpress]
+    fields: [path, decoded]
+    pattern: '(?i)/wp-json/wp/v2/users'
+
+  - id: cms.wp.config
+    title: WordPress config / debug leak
+    severity: high
+    category: recon
+    mitre: [T1552.001]
+    tags: [cms, wordpress]
+    fields: [path]
+    pattern: '(?i)(wp-config\.php|wp-config\.php\.(bak|old|txt)|wp-content/debug\.log)$'
+
+  - id: cms.wp.plugin_rce
+    title: Common WordPress plugin / upload probe
+    severity: high
+    category: rce
+    mitre: [T1190]
+    tags: [cms, wordpress]
+    fields: [path]
+    pattern: '(?i)(/wp-content/plugins/.+\.php|/wp-content/uploads/.+\.php|/wp-admin/admin-ajax\.php)'
+
+  - id: cms.joomla.admin
+    title: Joomla administrator
+    severity: medium
+    category: recon
+    mitre: [T1190]
+    tags: [cms, joomla]
+    fields: [path]
+    pattern: '(?i)^/administrator(/|$)'
+
+  - id: cms.drupal.user
+    title: Drupal user login
+    severity: low
+    category: brute
+    mitre: [T1110]
+    tags: [cms, drupal]
+    fields: [path]
+    pattern: '(?i)^/user/login(/|$)'
+
+  - id: cms.drupal.changelog
+    title: Drupal CHANGELOG leak
+    severity: medium
+    category: recon
+    mitre: [T1082]
+    tags: [cms, drupal]
+    fields: [path]
+    pattern: '(?i)/CHANGELOG\.txt$'

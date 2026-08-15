@@ -91,6 +91,24 @@ func TestParseTenantLogin(t *testing.T) {
 	}
 }
 
+func TestParseSecprobe(t *testing.T) {
+	line := `{"kind":"secprobe","src_ip":"203.0.113.9","reason":"canary_hit","path":"/.well-known/siem-canary","status":200}`
+	ev, ok := Parse(line, "app")
+	if !ok || ev.Kind != "secprobe" || ev.Reason != "canary_hit" || ev.Path != "/.well-known/siem-canary" {
+		t.Fatalf("%+v ok=%v", ev, ok)
+	}
+	line = `{"kind":"secprobe","src_ip":"203.0.113.9","reason":"enum_burst","path":"/api/public/x"}`
+	ev, ok = Parse(line, "app")
+	if !ok || ev.Reason != "enum_burst" {
+		t.Fatalf("reason: %+v", ev)
+	}
+	line = `{"kind":"secprobe","src_ip":"203.0.113.9","reason":"feature_deny"}`
+	ev, ok = Parse(line, "app")
+	if !ok || ev.Reason != "app_deny" {
+		t.Fatalf("app deny alias: %+v", ev)
+	}
+}
+
 func TestSkipBlank(t *testing.T) {
 	if _, ok := Parse("  ", "x"); ok {
 		t.Fatal("blank should not parse")

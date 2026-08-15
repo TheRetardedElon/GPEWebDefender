@@ -133,12 +133,23 @@
               <td>A route that 403s <code>/backup.zip</code> (do not serve a real dump)</td>
               <td><code>web.canary.fake_archive</code></td>
             </tr>
+            <tr>
+              <td>A 404/403 at <code>/.well-known/siem-canary</code> or <code>/__canary__/siem</code></td>
+              <td><code>web.canary.well_known</code></td>
+            </tr>
           </tbody>
         </table>
+        <p>
+          If the <em>application</em> can POST structured events, send
+          <code>kind=secprobe</code> and <code>reason=canary_hit</code> instead of
+          hoping the access log path matches. See <a href="16-reports-and-auth.html">16</a>.
+        </p>
         <div class="callout good">
-          <strong>Add your own</strong>
-          Drop another YAML in <code>rules/</code> or <code>--rules</code>.
-          Any path your real users never touch is a good canary. Rename the defaults if you publish this doc.
+          <strong>Add your own / optional packs</strong>
+          Drop YAML in <code>rules/</code> or <code>--rules</code>.
+          <code>packs/cms.yaml</code> is WordPress / Drupal / Joomla paths —
+          load it with <code>--rules packs</code> only if you want those.
+          Any path your real users never touch is a good canary.
         </div>
       </section>
 

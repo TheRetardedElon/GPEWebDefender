@@ -29,3 +29,12 @@ rules:
     tags: [canary]
     fields: [path]
     pattern: '(?i)^/(backup\.zip|dump\.sql|site-backup\.tar\.gz|wwwroot\.zip)$'
+
+  - id: web.canary.well_known
+    title: Well-known SIEM canary path
+    severity: critical
+    category: canary
+    mitre: [T1595.002]
+    tags: [canary]
+    fields: [path]
+    pattern: '(?i)^/\.well-known/siem-canary(/|$)|^/__canary__/siem(/|$)|^/__siem__/canary(/|$)'

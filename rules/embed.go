@@ -7,3 +7,6 @@ var WebYAML []byte
 
 //go:embed auth.yaml
 var AuthYAML []byte
+
+//go:embed secprobe.yaml
+var SecprobeYAML []byte

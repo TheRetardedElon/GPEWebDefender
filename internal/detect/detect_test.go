@@ -28,6 +28,26 @@ func loadWeb(t *testing.T) *Engine {
 	return e
 }
 
+func TestSecprobeReason(t *testing.T) {
+	e := loadWeb(t)
+	ev, ok := parse.Parse(`{"kind":"secprobe","src_ip":"203.0.113.9","reason":"canary_hit","path":"/.well-known/siem-canary"}`, "app")
+	if !ok {
+		t.Fatal("parse")
+	}
+	ev.ID = "s1"
+	ev.Time = time.Now().UTC()
+	got := e.Evaluate(ev)
+	found := false
+	for _, a := range got {
+		if a.RuleID == "sec.canary.hit" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected sec.canary.hit, got %+v", got)
+	}
+}
+
 func hit(t *testing.T, e *Engine, line string) []event.Alert {
 	t.Helper()
 	ev, ok := parse.Parse(line, "t")

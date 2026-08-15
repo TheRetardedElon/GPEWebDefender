@@ -30,6 +30,7 @@
         <a href="#web">Web auth</a>
         <a href="#linux">Linux auth</a>
         <a href="#app">App logins</a>
+        <a href="#probes">Probes</a>
         <a href="#api">API</a>
       </nav>
 
@@ -44,6 +45,7 @@
             <tr><td>Reports → Auth · Linux</td><td>Parsed <code>auth.log</code> / <code>secure</code> (sshd, sudo, PAM, console login).</td></tr>
             <tr><td>Reports → Auth · App</td><td>Structured <code>kind=applogin</code> events your application ships.</td></tr>
             <tr><td>Reports → Auth · Tenants</td><td>Site-owner / tenant logins: <code>kind=tenantlogin</code> or <code>kind=applogin</code> + <code>role=tenant</code>. Own map color.</td></tr>
+            <tr><td>Reports → Probes</td><td>Application security telemetry: <code>kind=secprobe</code> + a <code>reason</code>. Canaries, path probes, denied privileged routes, bad webhooks, login rate-limits, identifier bursts.</td></tr>
             <tr><td>Search</td><td>Keyword + IP + host. SQLite FTS5 on the manager — no Elastic.</td></tr>
           </tbody>
         </table>
@@ -146,13 +148,46 @@ X-SIEM-Source: app-api
         <p class="hint">Aliases for <code>kind</code>: <code>ownerlogin</code>, <code>tenant</code>, <code>owner</code>. Never send the password.</p>
       </section>
 
+      <section class="block" id="probes">
+        <h2>Application probes (<code>kind=secprobe</code>)</h2>
+        <p>
+          When the app itself can see an attack that the access log cannot
+          (a canary route, a rejected webhook signature, a privileged URL that
+          returned 403), POST a small event. The manager matches
+          <code>reason</code>, not your URL layout.
+        </p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>POST /api/ingest
+Authorization: Bearer SECRET
+Content-Type: application/json
+X-SIEM-Source: app-sec
+
+{ "kind": "secprobe", "src_ip": "203.0.113.9", "reason": "canary_hit",
+  "path": "/.well-known/siem-canary", "status": 404 }</code></pre>
+        <table>
+          <thead><tr><th><code>reason</code></th><th>Means</th><th>Rule</th></tr></thead>
+          <tbody>
+            <tr><td><code>canary_hit</code></td><td>Someone requested a planted decoy</td><td><code>sec.canary.hit</code></td></tr>
+            <tr><td><code>path_probe</code></td><td>Traversal, <code>.env</code>, admin path in the URL</td><td><code>sec.path.probe</code></td></tr>
+            <tr><td><code>sensitive_deny</code></td><td>401/403 on a privileged route</td><td><code>sec.authz.deny</code></td></tr>
+            <tr><td><code>webhook_reject</code></td><td>Bad webhook signature / auth</td><td><code>sec.webhook.fail</code></td></tr>
+            <tr><td><code>auth_rate_limit</code></td><td>429 on a login route</td><td><code>sec.auth.ratelimit</code></td></tr>
+            <tr><td><code>enum_burst</code></td><td>Many public-id lookups from one IP</td><td><code>sec.enum.burst</code></td></tr>
+            <tr><td><code>app_deny</code></td><td>A feature refused without credentials</td><td><code>sec.app.deny</code></td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          Never send tokens, signatures, or request bodies. Access-log canaries
+          (<a href="14-snoop-and-canaries.html">14</a>) still work if the app cannot POST.
+        </p>
+      </section>
+
       <section class="block" id="api">
         <h2>Report endpoints</h2>
         <table>
           <thead><tr><th>GET</th><th>Query</th><th>Body</th></tr></thead>
           <tbody>
             <tr><td><code>/api/reports/vectors</code></td><td><code>since</code>, <code>source</code></td><td>Category, rule, path, country, hourly, top IPs</td></tr>
-            <tr><td><code>/api/reports/auth</code></td><td><code>channel=web|linux|app</code>, <code>since</code>, <code>source</code></td><td>Fails, users, IPs, recent events</td></tr>
+            <tr><td><code>/api/reports/auth</code></td><td><code>channel=web|linux|app|tenant|probes</code>, <code>since</code>, <code>source</code></td><td>Fails, users, IPs, recent events</td></tr>
           </tbody>
         </table>
       </section>

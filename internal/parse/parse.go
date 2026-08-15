@@ -139,7 +139,9 @@ func parseJSON(line, source string) (event.Event, bool) {
 	))
 	kindHint := strings.ToLower(firstString(raw, "kind", "channel"))
 	if ip == "" && kindHint != event.KindAppLogin && kindHint != event.KindHostAuth &&
-		kindHint != "app" && kindHint != "linux" && kindHint != "ssh" {
+		kindHint != event.KindSecProbe && kindHint != event.KindTenantLogin &&
+		kindHint != "app" && kindHint != "linux" && kindHint != "ssh" &&
+		kindHint != "sec" && kindHint != "secevent" {
 		return event.Event{}, false
 	}
 	rawURL := firstString(raw, "request_uri", "uri", "url", "path", "request")
@@ -169,6 +171,7 @@ func parseJSON(line, source string) (event.Event, bool) {
 	outcome := strings.ToLower(firstString(raw, "outcome", "result"))
 	user := firstString(raw, "user", "username", "account")
 	role := firstString(raw, "role", "audience", "scope", "actor")
+	reason := event.NormalizeReason(firstString(raw, "reason", "why", "signal"))
 	kind = event.NormalizeKind(kind, role)
 	if kind == event.KindAppLogin || kind == event.KindTenantLogin {
 		if method == "" || method == "GET" && firstString(raw, "request_method") == "" {
@@ -216,6 +219,7 @@ func parseJSON(line, source string) (event.Event, bool) {
 		Kind:     kind,
 		Outcome:  outcome,
 		Role:     role,
+		Reason:   reason,
 	}
 	ev.ApplyLoginDefaults()
 	return ev, true

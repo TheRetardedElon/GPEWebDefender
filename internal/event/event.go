@@ -24,9 +24,10 @@ type Event struct {
 	Protocol  string    `json:"protocol,omitempty"`
 	Source    string    `json:"source"`
 	Raw       string    `json:"raw,omitempty"`
-	Kind      string    `json:"kind,omitempty"`     // web | hostauth | applogin | tenantlogin
+	Kind      string    `json:"kind,omitempty"`     // web | hostauth | applogin | tenantlogin | secprobe
 	Outcome   string    `json:"outcome,omitempty"`  // fail | ok
 	Role      string    `json:"role,omitempty"`     // tenant | owner | … (upgrades applogin)
+	Reason    string    `json:"reason,omitempty"`   // canary_hit | path_probe | … (kind=secprobe)
 }
 
 const (
@@ -34,6 +35,7 @@ const (
 	KindHostAuth    = "hostauth"
 	KindAppLogin    = "applogin"
 	KindTenantLogin = "tenantlogin"
+	KindSecProbe    = "secprobe"
 	OutcomeFail     = "fail"
 	OutcomeOK       = "ok"
 )
@@ -45,6 +47,8 @@ func NormalizeKind(kind, role string) string {
 	switch k {
 	case KindTenantLogin, "ownerlogin", "tenant", "owner", "siteowner", "site-owner", "site_owner":
 		return KindTenantLogin
+	case KindSecProbe, "secevent", "securitywatch", "sec":
+		return KindSecProbe
 	case KindAppLogin, "app", "appauth", "login":
 		k = KindAppLogin
 	case KindHostAuth, "linux", "ssh", "auth":
@@ -76,6 +80,30 @@ func (ev *Event) ApplyLoginDefaults() {
 	}
 	if ev.Path == "" {
 		ev.Path = "/login"
+	}
+}
+
+// NormalizeReason maps shipper aliases onto the public reason names.
+func NormalizeReason(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "unknown":
+		return ""
+	case "canary_hit", "canary", "canary-hit":
+		return "canary_hit"
+	case "path_probe", "pathprobe", "path-probe":
+		return "path_probe"
+	case "sensitive_deny", "authz_deny", "authz-deny":
+		return "sensitive_deny"
+	case "webhook_reject", "webhook_fail", "webhook-reject":
+		return "webhook_reject"
+	case "auth_rate_limit", "ratelimit", "rate_limit", "auth-rate-limit":
+		return "auth_rate_limit"
+	case "enum_burst", "enum-burst":
+		return "enum_burst"
+	case "app_deny", "feature_deny", "app-deny":
+		return "app_deny"
+	default:
+		return strings.ToLower(strings.TrimSpace(s))
 	}
 }
 

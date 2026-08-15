@@ -1,0 +1,66 @@
+# Structured app-security events (kind=secprobe). The application POSTs these
+# to /api/ingest. Reason names are generic — do not put a vendor's paths here.
+
+rules:
+  - id: sec.canary.hit
+    title: Application canary path hit
+    severity: high
+    category: canary
+    mitre: [T1595.002]
+    tags: [canary, secprobe]
+    fields: [reason]
+    pattern: '^canary_hit$'
+
+  - id: sec.path.probe
+    title: Application path probe
+    severity: medium
+    category: recon
+    mitre: [T1595.002]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^path_probe$'
+
+  - id: sec.authz.deny
+    title: Privileged path denied
+    severity: medium
+    category: authz
+    mitre: [T1190]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^sensitive_deny$'
+
+  - id: sec.webhook.fail
+    title: Webhook rejected (bad signature)
+    severity: medium
+    category: tamper
+    mitre: [T1565]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^webhook_reject$'
+
+  - id: sec.auth.ratelimit
+    title: Login rate-limited
+    severity: medium
+    category: brute
+    mitre: [T1110]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^auth_rate_limit$'
+
+  - id: sec.enum.burst
+    title: Public identifier enumeration burst
+    severity: medium
+    category: recon
+    mitre: [T1589]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^enum_burst$'
+
+  - id: sec.app.deny
+    title: App feature denied without credentials
+    severity: low
+    category: bypass
+    mitre: [T1190]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^app_deny$'

@@ -27,7 +27,7 @@ import (
 	"gpewebdefender/rules"
 )
 
-const version = "0.6.1"
+const version = "0.7.0"
 
 func main() {
 	log.SetFlags(0)
@@ -348,6 +348,9 @@ func loadBuiltin(eng *detect.Engine) error {
 		return fmt.Errorf("builtin rules: %w", err)
 	}
 	if extra, err := detect.ParseRules(rules.AuthYAML); err == nil {
+		rs = append(rs, extra...)
+	}
+	if extra, err := detect.ParseRules(rules.SecprobeYAML); err == nil {
 		rs = append(rs, extra...)
 	}
 	return eng.SetRules(rs)

@@ -376,6 +376,8 @@ func fieldOf(ev event.Event, name string) string {
 		return ev.Kind
 	case "outcome":
 		return ev.Outcome
+	case "reason", "why":
+		return ev.Reason
 	default:
 		return ""
 	}

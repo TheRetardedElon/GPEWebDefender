@@ -45,8 +45,8 @@ func (s *Store) initSearch() error {
 func (s *Store) indexEvent(ev event.Event) {
 	_, _ = s.db.Exec(`DELETE FROM search_idx WHERE bucket = 'event' AND ref = ?`, ev.ID)
 	_, _ = s.db.Exec(`INSERT INTO search_idx(bucket, ref, num, src_ip, user, host, source, path, url, title, evidence, kind, category, ts)
-		VALUES('event', ?, '', ?, ?, ?, ?, ?, ?, '', '', ?, '', ?)`,
-		ev.ID, ev.SrcIP, ev.User, ev.Host, ev.Source, ev.Path, ev.URL, ev.Kind, fmt.Sprintf("%d", ev.Time.UTC().UnixMilli()))
+		VALUES('event', ?, '', ?, ?, ?, ?, ?, ?, ?, '', ?, '', ?)`,
+		ev.ID, ev.SrcIP, ev.User, ev.Host, ev.Source, ev.Path, ev.URL, ev.Reason, ev.Kind, fmt.Sprintf("%d", ev.Time.UTC().UnixMilli()))
 }
 
 func (s *Store) indexAlert(al event.Alert) {

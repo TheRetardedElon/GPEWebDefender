@@ -96,6 +96,7 @@ CREATE INDEX IF NOT EXISTS al_source ON alerts(source);
 		"ALTER TABLE events ADD COLUMN user TEXT",
 		"ALTER TABLE events ADD COLUMN kind TEXT",
 		"ALTER TABLE events ADD COLUMN outcome TEXT",
+		"ALTER TABLE events ADD COLUMN reason TEXT",
 		"CREATE INDEX IF NOT EXISTS ev_kind ON events(kind)",
 		"CREATE INDEX IF NOT EXISTS ev_status ON events(status)",
 		"CREATE INDEX IF NOT EXISTS ev_user ON events(user)",
@@ -156,10 +157,10 @@ func (s *Store) nextAlertNum() (int64, error) {
 
 func (s *Store) InsertEvent(ev event.Event) error {
 	_, err := s.db.Exec(`INSERT OR REPLACE INTO events
-		(id, ts, src_ip, method, url, path, query, status, bytes, ua, referer, host, source, raw, user, kind, outcome)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		(id, ts, src_ip, method, url, path, query, status, bytes, ua, referer, host, source, raw, user, kind, outcome, reason)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		ev.ID, ev.Time.UnixMilli(), ev.SrcIP, ev.Method, ev.URL, ev.Path, ev.Query,
-		ev.Status, ev.Bytes, ev.UA, ev.Referer, ev.Host, ev.Source, ev.Raw, ev.User, ev.Kind, ev.Outcome)
+		ev.Status, ev.Bytes, ev.UA, ev.Referer, ev.Host, ev.Source, ev.Raw, ev.User, ev.Kind, ev.Outcome, ev.Reason)
 	if err != nil {
 		return err
 	}

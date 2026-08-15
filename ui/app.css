@@ -113,6 +113,12 @@ button, input { font: inherit; color: inherit; }
   background: var(--bg-3); border: 1px solid var(--copper); border-radius: 8px;
   padding: 7px 14px; cursor: pointer; color: var(--ink);
 }
+.settings.readonly input,
+.settings.readonly select,
+.settings.readonly textarea {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
 .who { color: var(--ink); font-size: 12px; }
 .acct-form { display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
 .acct-form .field { margin: 0; }

@@ -92,6 +92,8 @@ const CAT_COLOR = {
   hostauth: "#5b9fd4",
   applogin: "#c47ad4",
   tenant: "#ffb020",
+  authz: "#e05a4a",
+  secprobe: "#33cfff",
   tamper: "#33cfff",
   bypass: "#7c6cff",
   web: "#8a8274",
@@ -101,6 +103,7 @@ const CAT_LABEL = {
   traversal: "Traversal", injection: "Injection", recon: "Recon", scanner: "Scanner",
   brute: "Brute", dos: "Flood", snoop: "Snoop", canary: "Canary",
   hostauth: "Linux auth", applogin: "App login", tenant: "Tenant login",
+  authz: "Authz deny", secprobe: "App probe",
   tamper: "Tamper", bypass: "Bypass", web: "Other",
 };
 
@@ -705,16 +708,54 @@ function parseHomesStr(s) {
   }).filter(Boolean);
 }
 
+function isAdmin() {
+  return !!(currentUser && currentUser.role === "admin");
+}
+
 function addHomeRow(name, loc) {
   const box = $("#home-rows");
   if (!box) return;
   const row = document.createElement("div");
   row.className = "home-row";
-  row.innerHTML = `<input class="hn" placeholder="web-1" value="${esc(name || "")}" />
-    <input class="hl" placeholder="40.7,-74.0" value="${esc(loc || "")}" />
-    <button type="button" class="btn-x" aria-label="Remove">×</button>`;
-  row.querySelector(".btn-x").addEventListener("click", () => row.remove());
+  const canEdit = isAdmin() || !currentUser;
+  row.innerHTML = `<input class="hn" placeholder="web-1" value="${esc(name || "")}" ${canEdit ? "" : "disabled"} />
+    <input class="hl" placeholder="40.7,-74.0" value="${esc(loc || "")}" ${canEdit ? "" : "disabled"} />
+    ${canEdit ? `<button type="button" class="btn-x" aria-label="Remove">×</button>` : `<span></span>`}`;
+  const x = row.querySelector(".btn-x");
+  if (x) x.addEventListener("click", () => row.remove());
   box.appendChild(row);
+}
+
+function applyRoleChrome() {
+  const form = $("#settings-form");
+  const saveBtn = form && form.querySelector("button[type=submit]");
+  const add = $("#home-add");
+  const users = $("#users-block");
+  const admin = isAdmin();
+  const viewer = !!(currentUser && !admin);
+  if (form) {
+    form.querySelectorAll("input, select, textarea, button").forEach(el => {
+      if (el.closest("#pw-form")) return;
+      if (el.type === "submit" || el.id === "home-add" || el.classList.contains("btn-x")) {
+        el.hidden = viewer && (el.type === "submit" || el.id === "home-add");
+      }
+      if (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA") {
+        el.disabled = viewer;
+      }
+    });
+    form.classList.toggle("readonly", viewer);
+  }
+  if (saveBtn) {
+    saveBtn.disabled = viewer;
+    saveBtn.hidden = viewer;
+    saveBtn.title = viewer ? "Admins only" : "";
+  }
+  if (add) add.hidden = viewer;
+  if (users) users.hidden = viewer;
+  const intro = form && form.querySelector(".settings-intro p");
+  if (intro && viewer) {
+    intro.textContent = "View only. An admin can change pins, retention, and operators.";
+  }
 }
 
 function collectHomes() {
@@ -762,11 +803,16 @@ async function loadSettings() {
     if (brand) brand.textContent = st.site_name;
     document.title = st.site_name + " — Web Attack Monitor";
   }
+  applyRoleChrome();
 }
 
 async function saveSettings(ev) {
   ev.preventDefault();
   const status = $("#settings-status");
+  if (currentUser && !isAdmin()) {
+    if (status) status.textContent = "admins only";
+    return;
+  }
   const body = {
     site_name: $("#set-name").value.trim(),
     home: $("#set-home").value.trim(),
@@ -832,6 +878,9 @@ function authEmpty(kind) {
   }
   if (kind === "tenant") {
     return `<div class="hint-box">No tenant / site-owner login events yet. The app should POST <code>kind=tenantlogin</code> (or <code>kind=applogin</code> with <code>role=tenant</code>). Never send passwords.</div>`;
+  }
+  if (kind === "probes") {
+    return `<div class="hint-box">No application probe events yet. Your app POSTs <code>kind=secprobe</code> with a <code>reason</code> (<code>canary_hit</code>, <code>path_probe</code>, <code>sensitive_deny</code>, <code>webhook_reject</code>, <code>auth_rate_limit</code>, <code>enum_burst</code>, <code>app_deny</code>). Plant generic canaries at <code>/.well-known/siem-canary</code> or <code>/__canary__/siem</code>. Never send secrets.</div>`;
   }
   if (kind === "app") {
     return `<div class="hint-box">No application login events yet. Your app should POST JSON to <code>/api/ingest</code> (Bearer token, <code>X-SIEM-Source</code> set). Do not send passwords.<pre style="margin:10px 0 0;white-space:pre-wrap">{
@@ -1021,11 +1070,11 @@ function paintWho() {
   const who = $("#whoami");
   const out = $("#logout");
   const acct = $("#acct-block");
-  const saveBtn = $("#settings-form button[type=submit]");
   if (!currentUser) {
     if (who) who.hidden = true;
     if (out) out.hidden = true;
     if (acct) acct.hidden = true;
+    applyRoleChrome();
     return;
   }
   if (who) {
@@ -1034,10 +1083,7 @@ function paintWho() {
   }
   if (out) out.hidden = false;
   if (acct) acct.hidden = false;
-  if (saveBtn && currentUser.role !== "admin") {
-    saveBtn.disabled = true;
-    saveBtn.title = "Admins only";
-  }
+  applyRoleChrome();
 }
 
 async function bootAuth() {
@@ -1076,7 +1122,8 @@ async function loadUsers() {
     return;
   }
   if (setupBox) setupBox.hidden = true;
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!isAdmin()) {
+    if (block) block.hidden = true;
     if (adminBox) adminBox.hidden = true;
     return;
   }
