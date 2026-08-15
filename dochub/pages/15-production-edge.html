@@ -134,6 +134,7 @@ flowchart LR
           <li>Expose <code>/api/ingest</code> on the public HTTPS vhost</li>
           <li>Ship OSSEC/Wazuh “for completeness”</li>
           <li>Treat the ingest token as a human login, or leave <code>SIEM_ADMIN_PASSWORD</code> in the env file</li>
+          <li>Wrap the Go binary in PM2 / Node. systemd already restarts it. Use <code>siem restart</code> from <code>deploy/siem.example</code>.</li>
         </ul>
       </section>
 

@@ -1043,8 +1043,7 @@ function paintWho() {
 async function bootAuth() {
   let st;
   try {
-    const r = await fetch("/api/auth-status", { credentials: "same-origin" });
-    st = await r.json();
+    st = await authStatus();
   } catch (_) {
     return;
   }
@@ -1055,14 +1054,36 @@ async function bootAuth() {
   } catch (_) {}
 }
 
+async function authStatus() {
+  const r = await fetch("/api/auth-status", { credentials: "same-origin" });
+  if (!r.ok) throw new Error("auth-status");
+  return r.json();
+}
+
 async function loadUsers() {
   const block = $("#users-block");
-  if (!block || !currentUser || currentUser.role !== "admin") {
-    if (block) block.hidden = true;
+  const setupBox = $("#users-setup");
+  const adminBox = $("#users-admin");
+  if (!block) return;
+  let st = { users: 0, setup: true };
+  try {
+    st = await authStatus();
+  } catch (_) {}
+  if (st.setup || !st.users) {
+    block.hidden = false;
+    if (setupBox) setupBox.hidden = false;
+    if (adminBox) adminBox.hidden = true;
+    return;
+  }
+  if (setupBox) setupBox.hidden = true;
+  if (!currentUser || currentUser.role !== "admin") {
+    if (adminBox) adminBox.hidden = true;
     return;
   }
   block.hidden = false;
+  if (adminBox) adminBox.hidden = false;
   const body = $("#users-body");
+  if (!body) return;
   try {
     const list = await j("/api/users");
     if (!list || !list.length) {
@@ -1085,6 +1106,29 @@ async function loadUsers() {
     }).join("");
   } catch (err) {
     body.innerHTML = `<tr><td colspan="4" class="empty">${esc(err.message)}</td></tr>`;
+  }
+}
+
+async function createFirstAdmin(ev) {
+  ev.preventDefault();
+  const status = $("#setup-status");
+  const username = ($("#su-name") && $("#su-name").value.trim()) || "";
+  const password = ($("#su-pass") && $("#su-pass").value) || "";
+  const password2 = ($("#su-pass2") && $("#su-pass2").value) || "";
+  if (password !== password2) {
+    if (status) status.textContent = "passwords do not match";
+    return;
+  }
+  try {
+    await j("/api/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (status) status.textContent = "created — reloading";
+    location.reload();
+  } catch (err) {
+    if (status) status.textContent = err.message || "failed";
   }
 }
 
@@ -1187,6 +1231,8 @@ const pwForm = $("#pw-form");
 if (pwForm) pwForm.addEventListener("submit", changeOwnPassword);
 const userForm = $("#user-form");
 if (userForm) userForm.addEventListener("submit", createOperator);
+const setupForm = $("#setup-form");
+if (setupForm) setupForm.addEventListener("submit", createFirstAdmin);
 const usersBody = $("#users-body");
 if (usersBody) usersBody.addEventListener("click", userRowAction);
 const logoutBtn = $("#logout");

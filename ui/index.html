@@ -224,34 +224,59 @@
       </form>
     </section>
 
-    <section class="set-block" id="users-block" hidden>
+    <section class="set-block" id="users-block">
       <h3>Operators</h3>
-      <p class="field-help">Admins can create accounts and reset passwords. The ingest token cannot do this. You cannot delete or disable the last admin.</p>
-      <table class="rpt" id="users-table">
-        <thead><tr><th>User</th><th>Role</th><th>Last login</th><th></th></tr></thead>
-        <tbody id="users-body"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
-      </table>
-      <form id="user-form" class="acct-form">
-        <div class="field">
-          <label for="nu-name">New username</label>
-          <input id="nu-name" autocomplete="off" maxlength="32" required />
-        </div>
-        <div class="field">
-          <label for="nu-pass">Password</label>
-          <input id="nu-pass" type="password" autocomplete="new-password" required minlength="12" />
-        </div>
-        <div class="field">
-          <label for="nu-role">Role</label>
-          <select id="nu-role">
-            <option value="viewer">Viewer (dashboard only)</option>
-            <option value="admin">Admin (users + settings)</option>
-          </select>
-        </div>
-        <div class="settings-actions">
-          <button type="submit">Create user</button>
-          <span class="muted" id="user-status"></span>
-        </div>
-      </form>
+      <p class="field-help" id="users-help">People who open this dashboard. The ingest token cannot create or reset these accounts.</p>
+
+      <div id="users-setup">
+        <p class="field-help">No operator accounts yet. Create the first admin here. After this, the dashboard requires this login — the ingest token will not open it.</p>
+        <form id="setup-form" class="acct-form">
+          <div class="field">
+            <label for="su-name">Admin username</label>
+            <input id="su-name" autocomplete="username" maxlength="32" required />
+          </div>
+          <div class="field">
+            <label for="su-pass">Password (min 12)</label>
+            <input id="su-pass" type="password" autocomplete="new-password" required minlength="12" />
+          </div>
+          <div class="field">
+            <label for="su-pass2">Confirm password</label>
+            <input id="su-pass2" type="password" autocomplete="new-password" required minlength="12" />
+          </div>
+          <div class="settings-actions">
+            <button type="submit">Create admin</button>
+            <span class="muted" id="setup-status"></span>
+          </div>
+        </form>
+      </div>
+
+      <div id="users-admin" hidden>
+        <table class="rpt" id="users-table">
+          <thead><tr><th>User</th><th>Role</th><th>Last login</th><th></th></tr></thead>
+          <tbody id="users-body"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+        </table>
+        <form id="user-form" class="acct-form">
+          <div class="field">
+            <label for="nu-name">New username</label>
+            <input id="nu-name" autocomplete="off" maxlength="32" required />
+          </div>
+          <div class="field">
+            <label for="nu-pass">Password</label>
+            <input id="nu-pass" type="password" autocomplete="new-password" required minlength="12" />
+          </div>
+          <div class="field">
+            <label for="nu-role">Role</label>
+            <select id="nu-role">
+              <option value="viewer">Viewer (dashboard only)</option>
+              <option value="admin">Admin (users + settings)</option>
+            </select>
+          </div>
+          <div class="settings-actions">
+            <button type="submit">Create user</button>
+            <span class="muted" id="user-status"></span>
+          </div>
+        </form>
+      </div>
     </section>
   </div>
 
