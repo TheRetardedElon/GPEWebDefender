@@ -1,6 +1,6 @@
 # HTTPS front door for the UI + docs.
 # 1. Copy to sites-available, set YOUR_HOSTNAME
-# 2. Put the ingest token in /etc/nginx/gwd-bearer.inc (not in git):
+# 2. Put the ingest token in /etc/nginx/gpesiem-bearer.inc (not in git):
 #      proxy_set_header Authorization "Bearer YOUR_TOKEN";
 # 3. certbot --nginx -d YOUR_HOSTNAME
 # 4. Agents do NOT use this vhost for ingest.
@@ -19,8 +19,11 @@ server {
 
     # ssl_certificate …  (certbot fills this)
 
-    auth_basic "GPEWebDefender";
-    auth_basic_user_file /etc/nginx/.htpasswd-gwd;
+    # Optional extra gate. Turn this off after you create operator
+    # accounts in Settings — otherwise the browser popup (htpasswd)
+    # is a *different* password than Settings users.
+    # auth_basic "gpesiem";
+    # auth_basic_user_file /etc/nginx/.htpasswd-gpesiem;
 
     location = /api/ingest {
         deny all;
@@ -29,7 +32,7 @@ server {
     location / {
         proxy_pass http://127.0.0.1:8787;
         proxy_http_version 1.1;
-        include /etc/nginx/gwd-bearer.inc;
+        include /etc/nginx/gpesiem-bearer.inc;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;

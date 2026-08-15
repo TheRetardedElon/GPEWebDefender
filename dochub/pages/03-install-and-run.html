@@ -15,26 +15,140 @@
       <header class="hero">
         <h1>03 · Install &amp; run</h1>
         <p class="lead">
-          Native on Windows and Linux. Same source. No runtime other than the OS.
-          Go 1.22+ to build; the binary itself needs nothing.
+          Two ways. <strong>A</strong> is a script that does the boring Linux work.
+          <strong>B</strong> is you typing every command so you can see what happened.
+          Both end at the same place: a binary, a token, a UI on localhost.
         </p>
         <div class="meta-row">
-          <span class="pill live">Reviewed 2026-08-14</span>
-          <span class="pill">Windows amd64</span>
-          <span class="pill">Linux amd64</span>
+          <span class="pill live">Reviewed 2026-08-15</span>
+          <span class="pill">Method A · script</span>
+          <span class="pill">Method B · by hand</span>
         </div>
       </header>
 
       <nav class="jump-nav">
-        <a href="#build">Build</a>
-        <a href="#first">First run</a>
-        <a href="#flags">Flags</a>
-        <a href="#cross">Cross-compile</a>
+        <a href="#pick">Pick a shape</a>
+        <a href="#look">Look first (demo)</a>
+        <a href="#a">Method A · script</a>
+        <a href="#b">Method B · by hand</a>
+        <a href="#after">After it starts</a>
+        <a href="#build">Build the binary</a>
+        <a href="#flags">Every flag</a>
       </nav>
+
+      <section class="block" id="pick">
+        <h2>Pick a shape first</h2>
+        <p>If you skip this, you will install the wrong thing and think it is broken.</p>
+        <table>
+          <thead><tr><th>Your situation</th><th>What you install</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>You just want to see the screens</td>
+              <td><code>gpewebdefender demo</code> on your laptop. Fake attacks. Not your site.</td>
+            </tr>
+            <tr>
+              <td>One Linux box that already has nginx / Caddy and the access log</td>
+              <td><strong>All-in-one.</strong> The manager tails that log itself. No agent.</td>
+            </tr>
+            <tr>
+              <td>A small extra box for the monitor, and one or more web servers</td>
+              <td><strong>Split.</strong> Manager on the extra box. One agent on each web (or SSH) host.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>Do not expose port 8787 to the internet</strong>
+          The default bind is <code>127.0.0.1:8787</code>. Reach it with an SSH tunnel until you put HTTPS + login in front. Health is unauthenticated.
+        </div>
+      </section>
+
+      <section class="block" id="look">
+        <h2>Look first (any OS)</h2>
+        <ol>
+          <li>Build or download the binary for <em>this</em> computer (see <a href="#build">Build</a>).</li>
+          <li>In the repo folder, run <code>gpewebdefender demo</code> (Windows: <code>gpewebdefender.exe demo</code>).</li>
+          <li>Open <a href="http://127.0.0.1:8787">http://127.0.0.1:8787</a>.</li>
+          <li>You will see fake shots on the map. That is <strong>not</strong> the internet attacking you. Read <a href="04-demo-vs-live.html">04</a> before you panic.</li>
+        </ol>
+      </section>
+
+      <section class="block" id="a">
+        <h2>Method A — the script does it</h2>
+        <p>Linux + systemd + root. You still have to know the path of your access log and a name for each host.</p>
+        <h3>All-in-one (one box, has the log)</h3>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code># from the repo, as root
+chmod +x deploy/install-manager.sh deploy/install-agent.sh
+sudo ./deploy/install-manager.sh --all-in-one \
+  --tail /var/log/nginx/access.log \
+  --journal \
+  --home 40.7,-74.0</code></pre>
+        <h3>Split (monitor box first)</h3>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code># on the monitor
+sudo ./deploy/install-manager.sh --home 40.7,-74.0
+
+# on each web / SSH box
+scp root@MONITOR:/usr/local/bin/gpewebdefender /usr/local/bin/gpewebdefender
+scp root@MONITOR:/etc/gpewebdefender/env /etc/gpewebdefender/env
+sudo ./deploy/install-agent.sh \
+  --url http://MONITOR:8787 \
+  --name web-1 \
+  --tail /var/log/nginx/access.log \
+  --journal</code></pre>
+        <p>
+          Replace <code>MONITOR</code> with the monitor’s private hostname or IP.
+          Replace <code>web-1</code> with a short name you will recognize.
+          Replace the log path if you use Caddy / Apache / JSON.
+        </p>
+        <div class="callout good">
+          <strong>What the script actually does</strong>
+          Creates the <code>gpesiem</code> user, writes a random token to <code>/etc/gpewebdefender/env</code> if missing,
+          copies the binary + rules + this DocHub, installs systemd, starts the unit.
+          It will not overwrite an existing token.
+        </div>
+      </section>
+
+      <section class="block" id="b">
+        <h2>Method B — you type every step</h2>
+        <p>Same result as A. Use this if you do not want a script, or you are not on systemd.</p>
+        <ol>
+          <li>Copy the Linux binary to <code>/usr/local/bin/gpewebdefender</code> and <code>chmod +x</code> it.</li>
+          <li><code>useradd --system --home /var/lib/gpewebdefender --shell /usr/sbin/nologin gpesiem</code></li>
+          <li>Copy <code>rules/</code> and <code>dochub/</code> into <code>/var/lib/gpewebdefender/</code>. <code>chown -R gpesiem:gpesiem</code>.</li>
+          <li>Copy <code>deploy/env.example</code> to <code>/etc/gpewebdefender/env</code>. Put a long random value in <code>GWD_TOKEN</code>. Mode <code>640</code>.</li>
+          <li>Copy <code>deploy/gpewebdefender.service.example</code> to <code>/etc/systemd/system/gpewebdefender.service</code>. Edit listen / home / tail if you need them.</li>
+          <li><code>systemctl daemon-reload &amp;&amp; systemctl enable --now gpesiem</code></li>
+          <li>For each other host: copy <code>deploy/gpewebdefender-agent.service.example</code>, set <code>--url</code>, <code>--name</code>, <code>--tail</code>, same token.</li>
+        </ol>
+        <p>Full unit files and nginx: <a href="10-deploy.html">10</a> and <code>deploy/README.md</code>.</p>
+      </section>
+
+      <section class="block" id="after">
+        <h2>After it starts (do these in order)</h2>
+        <ol>
+          <li>
+            From your laptop: <code>ssh -L 8787:127.0.0.1:8787 user@THEBOX</code>
+            then open <a href="http://127.0.0.1:8787/login">http://127.0.0.1:8787/login</a>.
+          </li>
+          <li>
+            Create the first <strong>admin</strong> (a person, not the ingest token).
+            Or set <code>SIEM_ADMIN_USER</code> + <code>SIEM_ADMIN_PASSWORD</code> once in the env file, start the service, then <em>delete the password line</em>.
+          </li>
+          <li>Open <strong>Live</strong>. If you only ran demo, you will see fake shots. If you tailed a real log, wait for a probe.</li>
+          <li>Open <strong>Settings</strong>. Name the dashboard. Put the real server pin as country or <code>lat,lon</code>. Add one row per agent <code>--name</code>.</li>
+          <li>Open <strong>Reports → Insight</strong>. 1h / 24h / 7d is a real clock. CSV / JSON export is the same window.</li>
+          <li>Optional: drop a GeoLite2 / DB-IP <code>.mmdb</code> on the manager and pass <code>--geoip</code> (or re-run the script with <code>--geoip</code>). Without it, countries are coarse.</li>
+          <li>Optional HTTPS: copy <code>deploy/nginx-gwd.conf.example</code>, certbot, keep ingest off that vhost. See <a href="15-production-edge.html">15</a> and <a href="18-operator-accounts.html">18</a>.</li>
+        </ol>
+        <div class="callout info">
+          <strong>If the UI is empty</strong>
+          Demo not running, and no agent / <code>--tail</code> has sent a line yet.
+          Check <code>journalctl -u gpesiem -n 50</code> and that the log path exists and is readable.
+        </div>
+      </section>
 
       <section class="block" id="build">
         <h2>Build</h2>
-        <p class="hint">From the repo root.</p>
+        <p class="hint">From the repo root. Go 1.22+. CGO stays off. You do not need gcc.</p>
         <table>
           <thead><tr><th>Host</th><th>Command</th><th>Output</th></tr></thead>
           <tbody>
@@ -50,48 +164,15 @@
             </tr>
             <tr>
               <td>Windows → Linux</td>
-              <td><code>set GOOS=linux</code> · <code>set GOARCH=amd64</code> · <code>set CGO_ENABLED=0</code> · same <code>go build</code></td>
-              <td><code>gpesiem-linux-amd64</code> (~16 MB)</td>
+              <td><code>$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o gpesiem-linux-amd64 .\cmd\gpesiem</code></td>
+              <td><code>gpesiem-linux-amd64</code></td>
             </tr>
           </tbody>
         </table>
-        <div class="callout good">
-          <strong>CGO is off on purpose</strong>
-          SQLite is the pure-Go port. You do not need gcc on the build box or on the server.
-        </div>
-      </section>
-
-      <section class="block" id="first">
-        <h2>First run</h2>
-        <table>
-          <thead><tr><th>Intent</th><th>Command</th><th>Then</th></tr></thead>
-          <tbody>
-            <tr>
-              <td>See the UI with fake attacks</td>
-              <td><code>gpewebdefender demo</code></td>
-              <td>Open http://127.0.0.1:8787 — this is <strong>not</strong> your server.</td>
-            </tr>
-            <tr>
-              <td>Watch a real log (this box)</td>
-              <td><code>gpewebdefender serve --tail C:\logs\access.log</code><br/>or <code>--tail /var/log/nginx/access.log</code></td>
-              <td>Same UI. Source column is the file name.</td>
-            </tr>
-            <tr>
-              <td>Watch from another host</td>
-              <td>Manager: <code>serve --token SECRET --listen 127.0.0.1:8787</code><br/>Remote: <code>agent --url http://siem:8787 --token SECRET --tail …</code></td>
-              <td><a href="09-agent-and-hosts.html">09</a></td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="callout warn">
-          <strong>Default bind</strong>
-          <code>--listen</code> defaults to <code>127.0.0.1:8787</code>. Only this machine can open the UI.
-          That is correct until you put a gate in front of it. See <a href="10-deploy.html">10</a>.
-        </div>
       </section>
 
       <section class="block" id="flags">
-        <h2>Flags</h2>
+        <h2>Every flag and env var</h2>
         <h3>serve</h3>
         <table>
           <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -99,15 +180,24 @@
             <tr><td><code>--listen</code></td><td><code>127.0.0.1:8787</code></td><td>UI + API bind</td></tr>
             <tr><td><code>--db</code></td><td><code>gpewebdefender.db</code></td><td>SQLite path (WAL files appear beside it)</td></tr>
             <tr><td><code>--tail</code></td><td>empty</td><td>Access log(s), comma-separated</td></tr>
-            <tr><td><code>--journal</code></td><td>false</td><td>Follow systemd journal for sshd/sudo/login (Debian without <code>auth.log</code>)</td></tr>
+            <tr><td><code>--journal</code></td><td>false</td><td>Follow systemd journal for sshd/sudo/login</td></tr>
             <tr><td><code>--from-start</code></td><td>false</td><td>Replay existing lines, not only new appends</td></tr>
             <tr><td><code>--rules</code></td><td>empty</td><td>Extra YAML file or directory (built-in always loads)</td></tr>
-            <tr><td><code>--token</code></td><td>empty</td><td>Bearer / <code>?token=</code> required on <code>/api/*</code> except health</td></tr>
+            <tr><td><code>--token</code></td><td>empty</td><td>Ingest secret. After the first operator exists, the UI uses a session cookie instead</td></tr>
             <tr><td><code>--retain</code></td><td><code>168h</code></td><td>Raw event retention</td></tr>
-            <tr><td><code>--home</code></td><td><code>US</code></td><td>Default map pin: ISO country or <code>lat,lon</code></td></tr>
-            <tr><td><code>--homes</code></td><td>empty</td><td>Named pins: <code>name=lat,lon;name=ISO</code>. <code>name</code> matches agent <code>--name</code></td></tr>
-            <tr><td><code>--geoip</code></td><td>empty</td><td>Optional MaxMind/DB-IP <code>.mmdb</code> for real client IPs</td></tr>
-            <tr><td><code>--docs</code></td><td><code>./dochub</code> if present</td><td>DocHub at <code>/docs/</code></td></tr>
+            <tr><td><code>--home</code></td><td><code>US</code></td><td>Default map pin: ISO or <code>lat,lon</code></td></tr>
+            <tr><td><code>--homes</code></td><td>empty</td><td>Named pins: <code>name=lat,lon;name=ISO</code>. Matches agent <code>--name</code>. Settings wins after first save</td></tr>
+            <tr><td><code>--geoip</code></td><td>empty</td><td>Optional MaxMind/DB-IP <code>.mmdb</code></td></tr>
+            <tr><td><code>--docs</code></td><td><code>./dochub</code> if present</td><td>This DocHub at <code>/docs/</code></td></tr>
+          </tbody>
+        </table>
+        <h3>Environment (usually <code>/etc/gpewebdefender/env</code>)</h3>
+        <table>
+          <thead><tr><th>Name</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>GWD_TOKEN</code></td><td>Same value as <code>--token</code>. Agents and app POSTs use this.</td></tr>
+            <tr><td><code>GWD_HOMES</code></td><td>Same as <code>--homes</code>.</td></tr>
+            <tr><td><code>SIEM_ADMIN_USER</code> + <code>SIEM_ADMIN_PASSWORD</code></td><td>Create the first admin on boot. Then remove the password line. Or just use <code>/login</code>.</td></tr>
           </tbody>
         </table>
         <h3>demo</h3>
@@ -115,7 +205,7 @@
           <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
           <tbody>
             <tr><td><code>--listen</code></td><td><code>127.0.0.1:8787</code></td><td>UI bind</td></tr>
-            <tr><td><code>--db</code></td><td><code>gpewebdefender-demo.db</code></td><td>Separate file so demo never pollutes live</td></tr>
+            <tr><td><code>--db</code></td><td><code>gpewebdefender-demo.db</code></td><td>Separate file so demo never touches live</td></tr>
             <tr><td><code>--every</code></td><td><code>900ms</code></td><td>Interval between invented requests</td></tr>
           </tbody>
         </table>
@@ -124,22 +214,13 @@
           <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
           <tbody>
             <tr><td><code>--url</code></td><td>required</td><td>Manager base URL</td></tr>
-            <tr><td><code>--tail</code></td><td>required</td><td>Log path(s), comma-separated</td></tr>
-            <tr><td><code>--token</code></td><td>empty</td><td>Must match manager <code>--token</code></td></tr>
-            <tr><td><code>--name</code></td><td>hostname</td><td><code>X-SIEM-Source</code> header</td></tr>
+            <tr><td><code>--tail</code></td><td></td><td>Log path(s), comma-separated</td></tr>
+            <tr><td><code>--token</code></td><td>empty</td><td>Must match the manager</td></tr>
+            <tr><td><code>--name</code></td><td>hostname</td><td><code>X-SIEM-Source</code> — use a stable name</td></tr>
             <tr><td><code>--from-start</code></td><td>false</td><td>Ship historical lines too</td></tr>
-            <tr><td><code>--journal</code></td><td>false</td><td>Follow journald sshd/sudo. Can replace <code>--tail /var/log/auth.log</code></td></tr>
+            <tr><td><code>--journal</code></td><td>false</td><td>sshd / sudo from journald</td></tr>
           </tbody>
         </table>
-      </section>
-
-      <section class="block" id="cross">
-        <h2>Cross-compile from Windows (PowerShell)</h2>
-        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>$env:GOOS="linux"
-$env:GOARCH="amd64"
-$env:CGO_ENABLED="0"
-go build -o gpesiem-linux-amd64 .\cmd\gpesiem</code></pre>
-        <p class="hint">Copy the file to the Linux box, <code>chmod +x</code>, run. No Go install required on the server.</p>
       </section>
 
       <footer class="foot">GPEWebDefender DocHub · 03 · next: <a href="04-demo-vs-live.html">04 · Demo vs live</a></footer>

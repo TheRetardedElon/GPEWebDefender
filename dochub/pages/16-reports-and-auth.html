@@ -40,7 +40,7 @@
           <thead><tr><th>Tab</th><th>For</th></tr></thead>
           <tbody>
             <tr><td>Live</td><td>Map, SSE feed, severity search. Same as v0.2.</td></tr>
-            <tr><td>Reports → Attack vectors</td><td>Category / rule / path / country / hourly mix from alerts.</td></tr>
+            <tr><td>Reports → Insight</td><td>Visual breakdown of the same alerts. The range (1h / 24h / 7d) is a real clock window, labeled on the page. 1h uses 5-minute buckets, 24h hourly, 7d four-hour. Click a bar, host, country, path, or IP to open Search. CSV / JSON export is the rows in that same window — session cookie only, no ingest token, attachment download.</td></tr>
             <tr><td>Reports → Auth · Web</td><td>401/403 and login-path hits from access logs.</td></tr>
             <tr><td>Reports → Auth · Linux</td><td>Parsed <code>auth.log</code> / <code>secure</code> (sshd, sudo, PAM, console login).</td></tr>
             <tr><td>Reports → Auth · App</td><td>Structured <code>kind=applogin</code> events your application ships.</td></tr>
@@ -195,8 +195,10 @@ X-SIEM-Source: app-sec
         <table>
           <thead><tr><th>GET</th><th>Query</th><th>Body</th></tr></thead>
           <tbody>
-            <tr><td><code>/api/reports/vectors</code></td><td><code>since</code>, <code>source</code></td><td>Category, rule, path, country, hourly, top IPs</td></tr>
+            <tr><td><code>/api/reports/vectors</code></td><td><code>since</code>, <code>source</code></td><td>Category, severity, host, MITRE, path, country, adaptive buckets, top IPs</td></tr>
             <tr><td><code>/api/reports/auth</code></td><td><code>channel=web|linux|app|tenant|probes</code>, <code>since</code>, <code>source</code></td><td>Fails, users, IPs, recent events</td></tr>
+            <tr><td><code>/api/export/alerts</code></td><td><code>since</code>, <code>source</code>, <code>format=csv|json</code></td><td>Up to 5000 alert rows for that clock window. Session cookie. Attachment. No ingest token, no operator hashes.</td></tr>
+            <tr><td><code>/api/export/events</code></td><td>plus <code>channel</code></td><td>Auth / probe events for the same window.</td></tr>
           </tbody>
         </table>
       </section>

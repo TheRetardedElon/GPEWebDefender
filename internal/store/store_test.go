@@ -63,11 +63,27 @@ func TestReports(t *testing.T) {
 	_ = st.InsertEvent(event.Event{ID: "e1", Time: now, SrcIP: "1.1.1.1", Path: "/api/login", URL: "/api/login", Status: 401, Kind: "web", Source: "edge"})
 	_ = st.InsertEvent(event.Event{ID: "e2", Time: now, SrcIP: "9.9.9.9", Path: "sshd", URL: "failed password for root from 9.9.9.9", Status: 401, Kind: "hostauth", Outcome: "fail", User: "root", Method: "SSH", Source: "node"})
 	_ = st.InsertEvent(event.Event{ID: "e3", Time: now, SrcIP: "8.8.8.8", Path: "/api/login", Status: 401, Kind: "applogin", Outcome: "fail", User: "alice", Method: "LOGIN", Source: "app"})
-	_ = st.InsertAlert(&event.Alert{ID: "a1", Time: now, Title: "SQLi", Category: "sqli", Severity: "high", SrcIP: "1.1.1.1", URL: "/x?id=1", Source: "edge"})
+	_ = st.InsertAlert(&event.Alert{ID: "a1", Time: now, Title: "SQLi", Category: "sqli", Severity: "high", SrcIP: "1.1.1.1", URL: "/x?id=1", Source: "edge", MITRE: []string{"T1190"}})
 
 	vec, err := st.VectorReport(now.Add(-time.Hour), "")
 	if err != nil || vec.Alerts != 1 || len(vec.ByCategory) != 1 {
 		t.Fatalf("vectors: %+v %v", vec, err)
+	}
+	if len(vec.BySeverity) != 1 || vec.BySeverity[0].Name != "high" {
+		t.Fatalf("severity: %+v", vec.BySeverity)
+	}
+	if len(vec.BySource) != 1 || vec.BySource[0].Name != "edge" {
+		t.Fatalf("source: %+v", vec.BySource)
+	}
+	if len(vec.ByMITRE) != 1 || vec.ByMITRE[0].Name != "T1190" {
+		t.Fatalf("mitre: %+v", vec.ByMITRE)
+	}
+	if vec.Until.Before(vec.Since) {
+		t.Fatalf("window: since %v until %v", vec.Since, vec.Until)
+	}
+	exp, err := st.ExportAlerts(now.Add(-time.Hour), "", 10)
+	if err != nil || len(exp) != 1 || exp[0].Title != "SQLi" {
+		t.Fatalf("export: %+v %v", exp, err)
 	}
 	web, err := st.AuthReport("web", now.Add(-time.Hour), "")
 	if err != nil || web.Fails < 1 {

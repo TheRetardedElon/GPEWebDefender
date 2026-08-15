@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <g fill="none" stroke="#00ff66" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Core Server -->
+    <rect x="40" y="20" width="20" height="60" rx="3" />
+    <line x1="45" y1="35" x2="55" y2="35" stroke-width="3" />
+    <line x1="45" y1="50" x2="55" y2="50" stroke-width="3" />
+    <line x1="45" y1="65" x2="55" y2="65" stroke-width="3" />
+    
+    <!-- Incoming Flood Vectors (Left) -->
+    <path d="M 10,25 L 25,35 L 10,45" />
+    <line x1="25" y1="35" x2="35" y2="35" />
+    <path d="M 15,55 L 30,65 L 15,75" />
+    <line x1="30" y1="65" x2="40" y2="65" />
+
+    <!-- Incoming Flood Vectors (Right) -->
+    <path d="M 90,35 L 75,45 L 90,55" />
+    <line x1="75" y1="45" x2="65" y2="45" />
+  </g>
+</svg>

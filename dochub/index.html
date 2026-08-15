@@ -22,10 +22,10 @@
         </p>
         <div class="meta-row">
           <span class="pill live"><strong>Product</strong> web-attack monitor</span>
-          <span class="pill"><strong>Version</strong> 0.6.0</span>
+          <span class="pill"><strong>Version</strong> 0.9.14</span>
           <span class="pill warn"><strong>Not</strong> OSSEC source</span>
           <span class="pill">Chapters 00–19</span>
-          <span class="pill">Updated <span data-generated>2026-08-14</span></span>
+          <span class="pill">Updated <span data-generated>2026-08-15</span></span>
         </div>
       </header>
 
@@ -39,10 +39,11 @@
         Putting it on a server is <a href="pages/10-deploy.html"><strong>10</strong></a>.
       </div>
       <div class="callout good">
-        <strong>Status (2026-08-14)</strong>
-        v0.1.0: one Go binary, <strong>41 rules</strong> (injection, recon, snoop, canary, modern probes),
-        SQLite, live UI, color-filtered attack map, Windows + Linux.
+        <strong>Status (2026-08-15)</strong>
+        One Go binary + SQLite. Built-in YAML rules (web, snoop, canary, modern probes, Linux auth, app probes).
+        Live map (shots only when an alert happens), Insight reports, CSV/JSON export, operator accounts (Argon2id).
         Comfortable on a dedicated <strong>2 CPU / 2 GB</strong> box.
+        <strong>New here?</strong> <a href="pages/03-install-and-run.html">03 · Install &amp; run</a> — Method A is the script, Method B is by hand.
         Demo is fake. Live traffic starts when an agent (or <code>--tail</code>) ships a real access log.
         This DocHub is also served from the manager at <code>/docs/</code>.
       </div>
@@ -106,7 +107,7 @@ flowchart TB
           <a class="card" href="pages/03-install-and-run.html">
             <div class="num">03</div>
             <h3>Install &amp; run</h3>
-            <p>Windows + Linux binaries, flags, first command.</p>
+            <p>Method A = script. Method B = type it. Then create the first admin.</p>
             <div class="tags"><span class="tag core">ops</span></div>
           </a>
           <a class="card" href="pages/04-demo-vs-live.html">
@@ -164,7 +165,7 @@ flowchart TB
           <a class="card" href="pages/13-attack-map.html">
             <div class="num">13</div>
             <h3>Attack map</h3>
-            <p>Live arcs, home pin, optional GeoIP MMDB. Same feed as alerts.</p>
+            <p>Shots fire on live alerts, then fade. Home pin, optional GeoIP.</p>
             <div class="tags"><span class="tag live">map</span></div>
           </a>
           <a class="card" href="pages/14-snoop-and-canaries.html">
@@ -182,8 +183,26 @@ flowchart TB
           <a class="card" href="pages/16-reports-and-auth.html">
             <div class="num">16</div>
             <h3>Reports &amp; auth</h3>
-            <p>Vector mix, web 401/403, Linux sshd, application login JSON ingest.</p>
+            <p>Insight board, web 401/403, Linux sshd, application login JSON ingest, export.</p>
             <div class="tags"><span class="tag live">reports</span></div>
+          </a>
+          <a class="card" href="pages/17-configure.html">
+            <div class="num">17</div>
+            <h3>Configure it</h3>
+            <p>Where every knob lives. Settings vs env vs agent flags.</p>
+            <div class="tags"><span class="tag live">ops</span></div>
+          </a>
+          <a class="card" href="pages/18-operator-accounts.html">
+            <div class="num">18</div>
+            <h3>Operator accounts</h3>
+            <p>Argon2id, sessions, admin vs viewer. Ingest token cannot manage users.</p>
+            <div class="tags"><span class="tag live">auth</span></div>
+          </a>
+          <a class="card" href="pages/19-hook-your-app.html">
+            <div class="num">19</div>
+            <h3>Hook your app</h3>
+            <p>Fire-and-forget POST for logins, canaries, and denials the access log cannot see.</p>
+            <div class="tags"><span class="tag live">app</span></div>
           </a>
         </div>
       </section>
@@ -224,7 +243,7 @@ flowchart TB
       </section>
 
       <footer class="foot">
-        gpewebdefender DocHub · chapters 00–16 · configure your own hosts. Nothing inventory-specific in this tree.
+        gpewebdefender DocHub · chapters 00–19 · configure your own hosts. Nothing inventory-specific in this tree.
         Not OSSEC. Not a WAF. Develop carefully.
       </footer>
     </main>

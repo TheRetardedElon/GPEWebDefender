@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <g fill="none" stroke="#00ff66" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Background Root Directory -->
+    <path d="M 35,90 L 35,50 L 50,50 L 55,60 L 90,60 L 90,90 Z" stroke-opacity="0.3" />
+    <!-- Foreground Sub-Directory -->
+    <path d="M 20,70 L 20,30 L 35,30 L 40,40 L 70,40 L 70,70 Z" />
+    <!-- The Malicious Escape Arrow (../) -->
+    <path d="M 50,55 Q 50,15 15,15" />
+    <path d="M 25,25 L 10,15 L 25,5" />
+  </g>
+</svg>

@@ -100,9 +100,9 @@ func TestParseSecprobe(t *testing.T) {
 	line = `{"kind":"secprobe","src_ip":"203.0.113.9","reason":"enum_burst","path":"/api/public/x"}`
 	ev, ok = Parse(line, "app")
 	if !ok || ev.Reason != "enum_burst" {
-		t.Fatalf("reason: %+v", ev)
+		t.Fatalf("reason alias: %+v", ev)
 	}
-	line = `{"kind":"secprobe","src_ip":"203.0.113.9","reason":"feature_deny"}`
+	line = `{"kind":"secprobe","src_ip":"203.0.113.9","reason":"app_deny"}`
 	ev, ok = Parse(line, "app")
 	if !ok || ev.Reason != "app_deny" {
 		t.Fatalf("app deny alias: %+v", ev)

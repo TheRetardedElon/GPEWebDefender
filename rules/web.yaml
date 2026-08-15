@@ -1,4 +1,4 @@
-# GPEWebDefender — web-attack rules.
+# gpesiem — web-attack rules.
 # Matched against url-decoded path+query (and UA where noted).
 # These see what access logs see: URLs, methods, status, UA — not POST bodies.
 

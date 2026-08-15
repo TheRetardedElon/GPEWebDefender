@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- The neon cyber glow filter -->
+    <filter id="serverPreciseStaticGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    
+    <!-- The dot-grid pattern to match your GoPastEarth map aesthetic -->
+    <pattern id="serverPreciseStaticGrid" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.5" fill="#00ff66" opacity="0.4" />
+    </pattern>
+  </defs>
+
+  <g filter="url(#serverPreciseStaticGlow)">
+    <!-- Isometric Server Rack Top Face -->
+    <polygon points="40,60 100,30 160,60 100,90" 
+             fill="url(#serverPreciseStaticGrid)" 
+             stroke="#00ff66" 
+             stroke-width="1.2" 
+             stroke-linejoin="round" />
+             
+    <!-- Isometric Server Rack Left Face (Side Casing) -->
+    <polygon points="40,60 100,90 100,170 40,140" 
+             fill="url(#serverPreciseStaticGrid)" 
+             stroke="#00ff66" 
+             stroke-width="1.2" 
+             stroke-linejoin="round" />
+             
+    <!-- Isometric Server Rack Right Face (Front Panel) -->
+    <polygon points="100,90 160,60 160,140 100,170" 
+             fill="url(#serverPreciseStaticGrid)" 
+             stroke="#00ff66" 
+             stroke-width="1.2" 
+             stroke-linejoin="round" />
+
+    <!-- Front Panel Drive Bays / Rack Slots -->
+    <path d="M 100,105 L 160,75 
+             M 100,120 L 160,90 
+             M 100,135 L 160,105 
+             M 100,150 L 160,120" 
+          fill="none" 
+          stroke="#00ff66" 
+          stroke-width="1" 
+          stroke-dasharray="8 2" 
+          stroke-opacity="0.8" />
+
+    <!-- Static Data/Status Lights on Front Panel -->
+    <!-- Top Unit -->
+    <polygon points="110,95 115,92.5 115,96 110,98.5" fill="#00ff66" />
+    <polygon points="120,90 125,87.5 125,91 120,93.5" fill="#00ff66" />
+    
+    <!-- Second Unit -->
+    <polygon points="110,110 115,107.5 115,111 110,113.5" fill="#00ff66" />
+    
+    <!-- Third Unit -->
+    <polygon points="130,100 135,97.5 135,101 130,103.5" fill="#00ff66" />
+    <polygon points="140,95 145,92.5 145,96 140,98.5" fill="#00ff66" />
+    
+    <!-- Bottom Unit -->
+    <polygon points="110,140 115,137.5 115,141 110,143.5" fill="#00ff66" />
+    
+    <!-- Data Traces Routing Down the Side Panel -->
+    <path d="M 50,75 L 50,135 M 65,82 L 65,110 M 80,90 L 80,150" 
+          fill="none" 
+          stroke="#00ff66" 
+          stroke-width="0.75" 
+          stroke-dasharray="2 3" 
+          stroke-opacity="0.6" />
+  </g>
+</svg>

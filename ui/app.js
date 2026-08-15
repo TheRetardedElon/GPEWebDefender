@@ -185,7 +185,7 @@ function fitHomes() {
   if (!c) return;
   const w = c.clientWidth || 1600;
   const h = Math.min(MAP_VIEW_H, Math.max(280, Math.round(w * MAP_ASPECT)));
-  const homes = laidOutHomes();
+  const homes = selectedSource ? spreadHomes(shownHomes()) : laidOutHomes();
   if (!homes.length) {
     mapCam.z = 1; mapCam.x = 0; mapCam.y = 0;
     return;
@@ -245,12 +245,81 @@ function catShown(cat) {
   return map.filter.size === 0 || map.filter.has(cat || "web");
 }
 
+const TYPE_ICON = {
+  recon: "types/recon.svg",
+  scanner: "types/scanner.svg",
+  snoop: "types/recon.svg",
+  brute: "types/brute.svg",
+  dos: "types/dos.svg",
+  canary: "types/canary.svg",
+  traversal: "types/traversal.svg",
+  hostauth: "types/hostauth.svg",
+};
+const COUNTRY_ICON = {
+  ad: "countries/ad.svg", cn: "countries/cn.svg", do: "countries/do.svg",
+  de: "countries/de.svg", id: "countries/id.svg", ie: "countries/ie.svg",
+  jp: "countries/jp.svg", lr: "countries/lr.svg", my: "countries/my.svg",
+  nl: "countries/nl.svg", ru: "countries/ru.svg", ch: "countries/ch.svg",
+  us: "countries/us.svg", ca: "countries/ca.svg",
+  eg: "countries/eg.svg", sg: "countries/sg.svg",
+};
+const COUNTRY_ALIAS = {
+  "united states": "us", usa: "us", america: "us",
+  "the netherlands": "nl", netherlands: "nl", holland: "nl",
+  switzerland: "ch", japan: "jp", china: "cn", germany: "de",
+  indonesia: "id", ireland: "ie", malaysia: "my", russia: "ru",
+  andorra: "ad", liberia: "lr", "dominican republic": "do",
+  canada: "ca", egypt: "eg", singapore: "sg",
+};
+
 const ICONS = {};
-["node-ok.svg", "node-err.svg", "node-warn.svg", "canary.svg", "shield.svg", "flare.svg"].forEach(name => {
+[
+  "node-ok.svg", "node-err.svg", "node-warn.svg", "canary.svg", "shield.svg", "flare.svg",
+  "hosts/rack.svg", "hosts/datastore.svg", "hosts/edge.svg", "hosts/terminal.svg", "hosts/cloud.svg",
+  "types/recon.svg", "types/scanner.svg", "types/brute.svg", "types/dos.svg", "types/canary.svg", "types/traversal.svg",
+].forEach(name => {
   const im = new Image();
   im.src = "/icons/" + name;
   ICONS[name] = im;
 });
+
+function countryKey(code, name) {
+  const iso = String(code || "").trim().toLowerCase();
+  if (COUNTRY_ICON[iso]) return iso;
+  const alias = COUNTRY_ALIAS[String(name || "").trim().toLowerCase()];
+  if (alias) return alias;
+  return iso;
+}
+
+function countryArt(code, name) {
+  const k = countryKey(code, name);
+  return COUNTRY_ICON[k] || "";
+}
+
+function typeArt(cat) {
+  return TYPE_ICON[cat] || "";
+}
+
+function hostArt(name) {
+  const s = String(name || "").toLowerCase();
+  if (/proxy|edge|waf|gw/.test(s)) return "hosts/edge.svg";
+  if (/dnode|db|data|sql|store/.test(s)) return "hosts/datastore.svg";
+  if (/dev|work|term/.test(s)) return "hosts/terminal.svg";
+  if (/cloud|k8s|kube/.test(s)) return "hosts/cloud.svg";
+  return "hosts/rack.svg";
+}
+
+function hostRegionArt(name) {
+  const s = String(name || "").toLowerCase();
+  if (/web-1|chic|illinois/.test(s)) return "countries/us-il.svg";
+  if (/proxy|dnode|devbox|atlanta|ga/.test(s)) return "countries/us-ga.svg";
+  return "";
+}
+
+function artImg(src, cls, alt) {
+  if (!src) return "";
+  return `<img class="${esc(cls || "art-inline")}" src="/icons/${esc(src)}" alt="${esc(alt || "")}" />`;
+}
 
 function drawIcon(ctx, name, x, y, size) {
   const im = ICONS[name];
@@ -259,22 +328,87 @@ function drawIcon(ctx, name, x, y, size) {
   return true;
 }
 
-function iconForCat(cat) {
-  if (cat === "canary") return "canary.svg";
-  if (cat === "recon" || cat === "scanner" || cat === "snoop") return "node-warn.svg";
-  return "node-err.svg";
+function drawShieldMark(ctx, x, y, size) {
+  const r = size / 2;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  const pts = [
+    [0, -r],
+    [r * 0.86, -r * 0.48],
+    [r * 0.72, r * 0.32],
+    [0, r],
+    [-r * 0.72, r * 0.32],
+    [-r * 0.86, -r * 0.48],
+  ];
+  pts.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+  ctx.closePath();
+  ctx.fillStyle = hexA("#00f0ff", 0.28);
+  ctx.strokeStyle = "#7ee8ff";
+  ctx.lineWidth = 2.2;
+  ctx.shadowColor = "#00f0ff";
+  ctx.shadowBlur = 16;
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+  ctx.fillStyle = "#e8ffff";
+  ctx.fill();
+  ctx.restore();
 }
 
-function strokeGlow(ctx, x1, y1, cx, cy, x2, y2, col, width, alpha) {
+function drawHomePin(ctx, home, x, y, now, idx) {
+  const tag = home.source || home.name;
+  const mine = !selectedSource || selectedSource === tag;
+  const pulse = mine ? 0.5 + 0.5 * Math.sin(now / 380 + idx) : 0.15;
+  ctx.save();
+  ctx.globalAlpha = mine ? 1 : 0.42;
+  ctx.beginPath();
+  ctx.arc(x, y, 11 + pulse * 4, 0, Math.PI * 2);
+  ctx.fillStyle = hexA("#041410", 0.82);
+  ctx.fill();
+  ctx.strokeStyle = hexA("#00f0ff", mine ? 0.55 : 0.22);
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  const art = hostArt(home.name || home.source);
+  if (!drawIcon(ctx, art, x, y, 22)) {
+    drawShieldMark(ctx, x, y, 14);
+  }
+  const label = home.name || "home";
+  ctx.font = "600 11px Segoe UI, system-ui, sans-serif";
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = "#050807ee";
+  ctx.fillRect(x + 12, y - 14, tw + 8, 15);
+  ctx.strokeStyle = hexA("#00f0ff", 0.35);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 12, y - 14, tw + 8, 15);
+  ctx.fillStyle = "#7ee8ff";
+  ctx.fillText(label, x + 16, y - 3);
+  ctx.restore();
+}
+
+function iconForCat(cat) {
+  return typeArt(cat) || (cat === "canary" ? "canary.svg" : "node-err.svg");
+}
+
+function strokeGlowPartial(ctx, x1, y1, cx, cy, x2, y2, col, width, alpha, t) {
+  const tt = Math.max(0, Math.min(1, t));
+  if (tt <= 0 || alpha <= 0) return;
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(x1, y1);
-  ctx.quadraticCurveTo(cx, cy, x2, y2);
+  if (tt >= 1) {
+    ctx.quadraticCurveTo(cx, cy, x2, y2);
+  } else {
+    const ax = x1 + (cx - x1) * tt;
+    const ay = y1 + (cy - y1) * tt;
+    const bx = cx + (x2 - cx) * tt;
+    const by = cy + (y2 - cy) * tt;
+    ctx.quadraticCurveTo(ax, ay, ax + (bx - ax) * tt, ay + (by - ay) * tt);
+  }
   ctx.strokeStyle = hexA(col, alpha);
   ctx.lineWidth = width;
   ctx.lineCap = "round";
-  ctx.shadowColor = col;
-  ctx.shadowBlur = 14;
   ctx.stroke();
   ctx.restore();
 }
@@ -288,11 +422,22 @@ function quadCtrl(x1, y1, x2, y2) {
   return [mx, my - lift];
 }
 
+let mapRaf = 0;
+let mapIdle = 0;
+
+function kickMap() {
+  if (document.hidden) return;
+  if (mapRaf) return;
+  if (mapIdle) { clearTimeout(mapIdle); mapIdle = 0; }
+  mapRaf = requestAnimationFrame(drawMap);
+}
+
 function drawMap() {
+  mapRaf = 0;
   const c = map.canvas;
   if (!c) return;
   const ctx = map.ctx;
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(1.25, window.devicePixelRatio || 1);
   const w = c.clientWidth || 1600;
   const h = Math.min(MAP_VIEW_H, Math.max(280, Math.round(w * MAP_ASPECT)));
   if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
@@ -309,36 +454,8 @@ function drawMap() {
   const homes = laidOutHomes();
   const now = performance.now();
 
-  const drawn = new Set();
-  let nArc = 0;
-  for (const a of map.arcs) {
-    if (nArc >= 48) break;
-    if (!a.lat && !a.lon) continue;
-    if (!catShown(a.category) || !sourceShown(a.source)) continue;
-    const dest = destHome(a, homes);
-    const key = (a.src_ip || "") + ">" + dest.lat + "," + dest.lon + "|" + (a.category || "");
-    if (drawn.has(key)) continue;
-    drawn.add(key);
-    nArc++;
-    const [x1, y1] = project(a.lat, a.lon, w, h);
-    const [hx, hy] = project(dest.lat, dest.lon, w, h);
-    const [cx, cy] = quadCtrl(x1, y1, hx, hy);
-    const col = catColor(a.category);
-    ctx.save();
-    ctx.setLineDash([5, 9]);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.quadraticCurveTo(cx, cy, hx, hy);
-    ctx.strokeStyle = hexA(col, 0.55);
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-    ctx.restore();
-    strokeGlow(ctx, x1, y1, cx, cy, hx, hy, col, 2.8, 0.5);
-  }
-
   for (const a of map.fly) {
     if (!catShown(a.category)) continue;
-    if (!sourceShown(a.source)) continue;
     const dest = destHome(a, homes);
     const [hx, hy] = project(dest.lat, dest.lon, w, h);
     const age = now - a.born;
@@ -346,10 +463,10 @@ function drawMap() {
     const col = catColor(a.category);
     const [x1, y1] = project(a.lat, a.lon, w, h);
     const [cx, cy] = quadCtrl(x1, y1, hx, hy);
-    const travel = 1300;
+    const travel = 1400;
     const t = Math.min(1, age / travel);
-    const fade = age > a.life - 500 ? Math.max(0, (a.life - age) / 500) : 1;
-    strokeGlow(ctx, x1, y1, cx, cy, hx, hy, col, a.severity === "critical" ? 4.2 : 3.2, 0.85 * fade);
+    const fade = age > a.life - 380 ? Math.max(0, (a.life - age) / 380) : 1;
+    strokeGlowPartial(ctx, x1, y1, cx, cy, hx, hy, col, a.severity === "critical" ? 4.2 : 3.2, 0.92 * fade, t);
 
     const qpt = (tt) => {
       const u = easeOut(Math.max(0, Math.min(1, tt)));
@@ -358,93 +475,57 @@ function drawMap() {
         (1 - u) * (1 - u) * y1 + 2 * (1 - u) * u * cy + u * u * hy,
       ];
     };
-    ctx.save();
-    ctx.shadowColor = col;
-    ctx.shadowBlur = 22;
-    for (let k = 6; k >= 1; k--) {
-      const [tx, ty] = qpt(t - k * 0.035);
+    if (t < 1) {
+      const [tx, ty] = qpt(t - 0.05);
       ctx.beginPath();
-      ctx.arc(tx, ty, 2 + k * 0.7, 0, Math.PI * 2);
-      ctx.fillStyle = hexA(col, 0.12 * fade * k);
+      ctx.arc(tx, ty, 4, 0, Math.PI * 2);
+      ctx.fillStyle = hexA(col, 0.35 * fade);
+      ctx.fill();
+      const [px, py] = qpt(t);
+      ctx.beginPath();
+      ctx.arc(px, py, 7, 0, Math.PI * 2);
+      ctx.fillStyle = hexA(col, 0.7 * fade);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fillStyle = hexA("#ffffff", fade);
       ctx.fill();
     }
-    const [px, py] = qpt(t);
-    ctx.beginPath();
-    ctx.arc(px, py, 10, 0, Math.PI * 2);
-    ctx.fillStyle = hexA(col, 0.55 * fade);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(px, py, 5, 0, Math.PI * 2);
-    ctx.fillStyle = hexA("#ffffff", fade);
-    ctx.fill();
-    ctx.restore();
 
-    const ring = 10 + (now / 8 % 18);
     ctx.beginPath();
-    ctx.arc(x1, y1, ring, 0, Math.PI * 2);
-    ctx.strokeStyle = hexA(col, 0.35 * fade * (1 - (ring - 10) / 18));
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    if (!drawIcon(ctx, iconForCat(a.category), x1, y1, 22)) {
-      ctx.beginPath();
-      ctx.arc(x1, y1, 4, 0, Math.PI * 2);
-      ctx.fillStyle = hexA(col, 0.95 * fade);
-      ctx.fill();
-    }
-    if (t > 0.72) {
-      drawIcon(ctx, "flare.svg", hx, hy, 28 + (t - 0.72) * 40);
-    }
+    ctx.arc(x1, y1, 4, 0, Math.PI * 2);
+    ctx.fillStyle = hexA(col, 0.95 * fade);
+    ctx.fill();
   }
   map.fly = map.fly.filter(a => now - a.born < a.life);
 
-  const seen = new Set();
-  for (const a of map.arcs) {
-    if (!a.country || !catShown(a.category) || !sourceShown(a.source)) continue;
-    const k = a.src_ip + "|" + (a.category || "");
-    if (seen.has(k)) continue;
-    seen.add(k);
-    const [x, y] = project(a.lat, a.lon, w, h);
-    if (!drawIcon(ctx, iconForCat(a.category), x, y, 18)) {
-      ctx.beginPath();
-      ctx.arc(x, y, 3.4, 0, Math.PI * 2);
-      ctx.fillStyle = hexA(catColor(a.category), 0.9);
-      ctx.fill();
-    }
-  }
-
-  homes.forEach((h, i) => {
-    const [hx, hy] = project(h.lat, h.lon, w, h);
-    const pulse = 0.5 + 0.5 * Math.sin(now / 380 + i);
-    ctx.beginPath();
-    ctx.arc(hx, hy, 18 + pulse * 10, 0, Math.PI * 2);
-    ctx.fillStyle = hexA("#00f0ff", 0.12 + pulse * 0.08);
-    ctx.fill();
-    drawIcon(ctx, "shield.svg", hx, hy, 36);
-    const label = h.name || "home";
-    ctx.font = "600 11px Segoe UI, system-ui, sans-serif";
-    const tw = ctx.measureText(label).width;
-    ctx.fillStyle = "#050807cc";
-    ctx.fillRect(hx + 16, hy - 16, tw + 8, 16);
-    ctx.fillStyle = "#7ee8ff";
-    ctx.fillText(label, hx + 20, hy - 4);
+  homes.forEach((home, i) => {
+    if (home.lat == null || home.lon == null) return;
+    const [hx, hy] = project(home.lat, home.lon, w, h);
+    if (!Number.isFinite(hx) || !Number.isFinite(hy)) return;
+    drawHomePin(ctx, home, hx, hy, now, i);
   });
 
   ctx.restore();
-  replayShots(false);
-  requestAnimationFrame(drawMap);
+  if (map.fly.length || shotQ.length) kickMap();
+  else mapIdle = setTimeout(() => { mapIdle = 0; kickMap(); }, 500);
 }
 
 function sourceShown(src) {
   return !selectedSource || !src || src === selectedSource;
 }
 
-function shownHomes() {
-  if (selectedSource) {
-    const named = (map.homes || []).find(h => h.source === selectedSource || h.name === selectedSource);
-    return [named || map.home];
-  }
+function allConfiguredHomes() {
   if (map.homes && map.homes.length) return map.homes.slice();
   return [map.home];
+}
+
+function shownHomes() {
+  if (selectedSource) {
+    const named = allConfiguredHomes().find(h => h.source === selectedSource || h.name === selectedSource);
+    return [named || map.home];
+  }
+  return allConfiguredHomes();
 }
 
 function spreadHomes(homes) {
@@ -468,8 +549,14 @@ function spreadHomes(homes) {
   return out;
 }
 
+let homesCache = null, homesCacheKey = "";
 function laidOutHomes() {
-  return spreadHomes(shownHomes());
+  const list = allConfiguredHomes();
+  const key = list.map(h => (h.name || "") + "," + h.lat + "," + h.lon).join("|");
+  if (homesCache && homesCacheKey === key) return homesCache;
+  homesCacheKey = key;
+  homesCache = spreadHomes(list);
+  return homesCache;
 }
 
 function destHome(a, homes) {
@@ -491,31 +578,56 @@ function hexA(hex, a) {
 
 function pushFly(a) {
   if (!a || a.lat == null || (a.lat === 0 && a.lon === 0 && !a.country)) return;
+  if (a.id && map.fly.some(f => f.id === a.id)) return;
   map.fly.push({
     ...a,
     born: performance.now(),
-    life: 2200 + Math.random() * 400,
+    life: 1850 + Math.random() * 200,
   });
-  if (map.fly.length > 80) map.fly.shift();
+  if (map.fly.length > 24) map.fly.shift();
 }
 
-let replayAt = 0;
-function replayShots(force) {
+const shotQ = [];
+let shotKick = 0;
+const SHOT_MAX = 6;
+const SHOT_GAP = 100;
+
+function enqueueShot(a) {
+  const k = (a.src_ip || "") + ">" + (a.source || "") + "|" + (a.category || "");
   const now = performance.now();
-  if (!force && now - replayAt < 7000) return;
-  replayAt = now;
-  const seen = new Set();
-  const list = [];
-  for (const a of map.arcs) {
-    if (!catShown(a.category) || !sourceShown(a.source)) continue;
-    if (!a.lat && !a.lon) continue;
-    const k = (a.src_ip || "") + "|" + (a.category || "") + "|" + (a.source || "");
-    if (seen.has(k)) continue;
-    seen.add(k);
-    list.push(a);
-    if (list.length >= 18) break;
+  for (let i = shotQ.length - 1; i >= 0; i--) {
+    if (shotQ[i]._k === k && now - shotQ[i]._qat < 450) {
+      shotQ[i]._n = (shotQ[i]._n || 1) + 1;
+      return;
+    }
   }
-  list.forEach((a, i) => setTimeout(() => pushFly(a), i * 160));
+  shotQ.push({ ...a, _k: k, _qat: now, _n: 1 });
+  if (shotQ.length > 36) shotQ.shift();
+  pumpShots();
+  kickMap();
+}
+
+function pumpShots() {
+  if (shotKick) return;
+  const tick = () => {
+    shotKick = 0;
+    const now = performance.now();
+    const live = map.fly.filter(f => now - f.born < f.life).length;
+    if (live < SHOT_MAX && shotQ.length) pushFly(shotQ.shift());
+    if (shotQ.length) shotKick = setTimeout(tick, SHOT_GAP);
+  };
+  tick();
+}
+
+function fireShot(a) {
+  if (!a) return;
+  if (a.id) {
+    if (seen.has(a.id)) return;
+    seen.add(a.id);
+  }
+  if (a.has_geo || a.country || (a.lat != null && (a.lat !== 0 || a.lon !== 0))) {
+    enqueueShot(a);
+  }
 }
 
 function visibleArcs() {
@@ -543,7 +655,7 @@ function renderMapMeta() {
       cats.map(c => {
         const on = allOn || map.filter.has(c);
         return `<button type="button" class="key ${on ? "on" : "dim"}" data-cat="${esc(c)}" style="--sw:${catColor(c)}">
-          <span class="swatch"></span>${esc(CAT_LABEL[c] || c)} ${counts[c]}
+          ${artImg(typeArt(c), "art-inline", c)}<span class="swatch"></span>${esc(CAT_LABEL[c] || c)} ${counts[c]}
         </button>`;
       }).join("");
   }
@@ -552,11 +664,13 @@ function renderMapMeta() {
   for (const a of vis) {
     const name = a.name || a.country;
     if (!name) continue;
-    originCounts[name] = (originCounts[name] || 0) + 1;
+    if (!originCounts[name]) originCounts[name] = { n: 0, iso: a.country || "" };
+    originCounts[name].n++;
+    if (a.country) originCounts[name].iso = a.country;
   }
-  const origins = Object.entries(originCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const origins = Object.entries(originCounts).sort((a, b) => b[1].n - a[1].n).slice(0, 6);
   $("#map-legend").innerHTML = origins.length
-    ? origins.map(([n, c]) => `<span><b>${esc(n)}</b> ${c}</span>`).join("")
+    ? origins.map(([n, rec]) => `<span>${artImg(countryArt(rec.iso, n), "art-flag", n)}<b>${esc(n)}</b> ${rec.n}</span>`).join("")
     : (map.geoip
       ? `<span>nothing to plot in this filter</span>`
       : `<span>drop a GeoLite2 / DB-IP <code>.mmdb</code> on the box and real IPs will arc. until then, the list below is the truth.</span>`);
@@ -618,6 +732,7 @@ function mergeAlerts(incoming, mode) {
   const byId = new Map(alertBuf.map(a => [a.id, a]));
   for (const a of incoming) byId.set(a.id, a);
   alertBuf = [...byId.values()].sort((a, b) => (b.num || 0) - (a.num || 0));
+  if (alertBuf.length > 50) alertBuf.length = 50;
   if (mode === "reset") {
     // keep only this page plus we already replaced via byId from incoming-only
     const ids = new Set(incoming.map(a => a.id));
@@ -626,10 +741,19 @@ function mergeAlerts(incoming, mode) {
   }
 }
 
+let alertPaint = 0;
+function renderAlertsSoon() {
+  if (alertPaint) return;
+  alertPaint = requestAnimationFrame(() => {
+    alertPaint = 0;
+    renderAlerts();
+  });
+}
+
 function renderAlerts() {
   const box = $("#alerts");
   const list = alertBuf;
-  const shown = list.filter(a => catShown(a.category));
+  const shown = list.filter(a => catShown(a.category)).slice(0, 40);
   if (!shown.length) {
     box.innerHTML = `<div class="empty">${list.length ? "Nothing in this map filter…" : "Quiet. Waiting on web traffic…"}</div>`;
     $("#feed-meta").textContent = "0 shown";
@@ -646,13 +770,7 @@ function renderAlerts() {
       </div>
       <div class="when">${ago(a.time)}</div>
     </div>`).join("") + more;
-  box.querySelectorAll(".row").forEach(el => {
-    el.addEventListener("click", () => {
-      const a = shown.find(x => x.id === el.dataset.id);
-      if (a) openDetail(a);
-    });
-  });
-  $("#feed-meta").textContent = shown.length + (alertHasMore ? "+" : "") + " shown";
+  $("#feed-meta").textContent = shown.length + (alertHasMore || list.length > 40 ? "+" : "") + " shown";
 }
 
 async function fetchAlertPage(extra) {
@@ -682,11 +800,14 @@ async function loadAlerts(mode) {
     if (mode === "reset") {
       alertBuf = incoming.slice();
       alertHasMore = !!page.has_more;
+      for (const a of incoming) if (a.id) seen.add(a.id);
     } else if (mode === "older") {
       mergeAlerts(incoming, "older");
       alertHasMore = !!page.has_more;
+      for (const a of incoming) if (a.id) seen.add(a.id);
     } else {
       mergeAlerts(incoming, "newer");
+      for (const a of incoming) fireShot(a);
     }
     lastAlerts = alertBuf;
     renderAlerts();
@@ -720,7 +841,25 @@ function renderAttackers(list) {
 
 function openDetail(a) {
   const d = $("#detail");
+  const originName = a.country_name || a.country || "";
+  const originSrc = countryArt(a.country, a.country_name);
+  const catSrc = typeArt(a.category);
+  const hostSrc = a.source ? hostArt(a.source) : "";
+  const regionSrc = a.source ? hostRegionArt(a.source) : "";
+  const tile = (src, cap, extra) => {
+    if (!src && !cap) return "";
+    return `<div class="detail-art">
+      ${artImg(src, "detail-svg", cap)}
+      ${extra ? artImg(extra, "detail-svg sub", cap) : ""}
+      <span class="cap">${esc(cap || "—")}</span>
+    </div>`;
+  };
   d.querySelector("article").innerHTML = `
+    <div class="detail-hero">
+      ${tile(originSrc, originName || (a.src_ip || "origin"))}
+      ${tile(catSrc, CAT_LABEL[a.category] || a.category || "event")}
+      ${tile(hostSrc, a.source || "host", regionSrc)}
+    </div>
     <h3>${esc(a.title)}</h3>
     <dl>
       <dt>Number</dt><dd>${a.num ? "#" + a.num : "—"}</dd>
@@ -728,7 +867,7 @@ function openDetail(a) {
       <dt>Tags</dt><dd>${esc((a.tags || []).join(", ") || "—")}</dd>
       <dt>When</dt><dd>${esc(a.time)}</dd>
       <dt>Source IP</dt><dd>${esc(a.src_ip)}</dd>
-      <dt>Country</dt><dd>${esc(a.country_name || a.country || "—")}</dd>
+      <dt>Country</dt><dd>${esc(originName || "—")}</dd>
       <dt>Request</dt><dd>${esc(a.method)} ${esc(a.url)}</dd>
       <dt>Status</dt><dd>${esc(a.status)}</dd>
       <dt>Rule</dt><dd>${esc(a.rule_id)}</dd>
@@ -780,7 +919,6 @@ async function refresh() {
   map.geoip = !!feed.geoip;
   map.arcs = feed.arcs || [];
   map.countries = feed.countries || [];
-  replayShots(true);
   sourceList = (srcs && srcs.sources) || [];
   fillHostSelect();
   renderStats(st);
@@ -789,6 +927,15 @@ async function refresh() {
   await loadAlerts(alertBuf.length ? "newer" : "reset");
   if (currentView === "reports") refreshReports().catch(() => {});
   if (currentView === "settings") loadSettings().catch(() => {});
+}
+
+let refreshSoon = 0;
+function scheduleRefresh() {
+  if (refreshSoon) return;
+  refreshSoon = setTimeout(() => {
+    refreshSoon = 0;
+    refresh().catch(() => {});
+  }, 900);
 }
 
 function connect() {
@@ -806,15 +953,12 @@ function connect() {
   es.addEventListener("alert", (ev) => {
     try {
       const a = JSON.parse(ev.data);
-      if (seen.has(a.id)) return;
-      seen.add(a.id);
-      if ((a.has_geo || a.country) && sourceShown(a.source)) pushFly(a);
+      fireShot(a);
       if (a.id) {
         mergeAlerts([a], "newer");
         lastAlerts = alertBuf;
-        renderAlerts();
+        renderAlertsSoon();
       }
-      refresh().catch(() => {});
     } catch (_) {}
   });
 }
@@ -868,10 +1012,21 @@ if (hostSel) {
 }
 
 map.canvas = $("#map");
-map.ctx = map.canvas.getContext("2d");
-mapArt.addEventListener("load", () => requestAnimationFrame(drawMap));
-Object.values(ICONS).forEach(im => im.addEventListener("load", () => requestAnimationFrame(drawMap)));
-requestAnimationFrame(drawMap);
+map.ctx = map.canvas.getContext("2d", { alpha: false });
+mapArt.addEventListener("load", () => kickMap());
+Object.values(ICONS).forEach(im => im.addEventListener("load", () => kickMap()));
+kickMap();
+document.addEventListener("visibilitychange", () => { if (!document.hidden) kickMap(); });
+const alertBox = $("#alerts");
+if (alertBox && !alertBox.dataset.bound) {
+  alertBox.dataset.bound = "1";
+  alertBox.addEventListener("click", (e) => {
+    const row = e.target.closest(".row");
+    if (!row) return;
+    const a = alertBuf.find(x => x.id === row.dataset.id);
+    if (a) openDetail(a);
+  });
+}
 
 const mapTip = $("#map-tip");
 if (map.canvas) {
@@ -882,6 +1037,7 @@ if (map.canvas) {
     const r = cnv.getBoundingClientRect();
     const w = cnv.clientWidth || 1, h = cnv.clientHeight || 1;
     zoomAt(ev.clientX - r.left, ev.clientY - r.top, ev.deltaY > 0 ? 0.88 : 1.14, w, h);
+    kickMap();
   }, { passive: false });
   cnv.addEventListener("mousedown", (ev) => {
     if (ev.button !== 0) return;
@@ -897,6 +1053,7 @@ if (map.canvas) {
     lastX = ev.clientX; lastY = ev.clientY;
     const w = cnv.clientWidth || 1, h = cnv.clientHeight || 1;
     clampCam(w, h);
+    kickMap();
   });
   if (mapTip) {
     cnv.addEventListener("mousemove", (ev) => {
@@ -906,7 +1063,7 @@ if (map.canvas) {
       const w = cnv.clientWidth || 1, h = cnv.clientHeight || 1;
       const wrld = screenToWorld(sx, sy, w, h);
       let best = null, bestD = 18 / mapCam.z;
-      for (const a of map.arcs) {
+      for (const a of map.fly) {
         if (!a.lat && !a.lon) continue;
         if (!catShown(a.category) || !sourceShown(a.source)) continue;
         const [px, py] = project(a.lat, a.lon, w, h);
@@ -960,6 +1117,48 @@ document.addEventListener("click", (e) => {
 let currentView = "live";
 let reportKind = "vectors";
 let reportRange = "24h";
+let displayTZ = "UTC";
+let lastReport = null;
+
+function useLocalTime() { return displayTZ === "local"; }
+
+function fmtWhen(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  if (useLocalTime()) return d.toLocaleString();
+  return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+}
+
+function fmtTick(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  if (useLocalTime()) {
+    if (reportRange === "1h") return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    if (reportRange === "168h") return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit" });
+    return d.toLocaleTimeString(undefined, { hour: "2-digit" });
+  }
+  if (reportRange === "1h") return d.toISOString().slice(11, 16);
+  if (reportRange === "168h") return d.toISOString().slice(5, 13).replace("T", " ");
+  return d.toISOString().slice(11, 13) + "z";
+}
+
+function rangeLabel() {
+  return { "1h": "last 1 hour", "24h": "last 24 hours", "168h": "last 7 days" }[reportRange] || reportRange;
+}
+
+function paintReportWindow(rep) {
+  const el = $("#report-window");
+  if (!el) return;
+  const from = fmtWhen(rep && rep.since);
+  const to = fmtWhen((rep && rep.until) || new Date().toISOString());
+  const host = selectedSource || "all hosts";
+  const bucket = (rep && rep.bucket) === "5m" ? "5-minute buckets" : (rep && rep.bucket) === "4h" ? "4-hour buckets" : (reportKind === "vectors" ? "hourly buckets" : "event time");
+  let msg = host + " · " + rangeLabel() + " · " + from + " → " + to;
+  if (reportKind === "vectors") msg += " · " + bucket;
+  if (rep && reportKind === "vectors" && !(rep.alerts)) msg += " · no alerts in this exact window";
+  el.textContent = msg;
+}
 try {
   currentView = localStorage.getItem("gpesiem.view") || "live";
   reportKind = localStorage.getItem("gpesiem.report") || "vectors";
@@ -1081,7 +1280,8 @@ async function loadSettings() {
   const retain = $("#set-retain");
   if (retain) retain.value = retainChoice(st.retain);
   const tz = $("#set-tz");
-  if (tz) tz.value = st.timezone === "local" ? "local" : "UTC";
+  displayTZ = st.timezone === "local" ? "local" : "UTC";
+  if (tz) tz.value = displayTZ === "local" ? "local" : "UTC";
   const meta = $("#settings-meta");
   if (meta) {
     meta.textContent = (data.rules || 0) + " detection rules · map GeoIP " +
@@ -1140,10 +1340,17 @@ function panel(title, inner, span) {
   return `<section class="panel ${span || ""}"><header><h2>${esc(title)}</h2></header>${inner}</section>`;
 }
 
-function nameTable(rows, nameH, extra) {
+function nameTable(rows, nameH, extra, opts) {
   if (!rows || !rows.length) return `<div class="empty">Nothing in this window</div>`;
+  const iconOf = opts && opts.icon;
   return `<table class="rpt"><thead><tr><th>${esc(nameH)}</th><th>Count</th>${extra ? "<th>" + extra + "</th>" : ""}</tr></thead><tbody>` +
-    rows.map(r => `<tr><td class="mono">${esc(r.name || r.id || r.src_ip)}</td><td>${r.count ?? r.alerts ?? 0}</td>${extra ? "<td>" + esc(r.ips || r.severity || r.country || "") + "</td>" : ""}</tr>`).join("") +
+    rows.map(r => {
+      const mark = iconOf ? iconOf(r) : "";
+      const raw = r.name || r.id || r.src_ip || "";
+      const label = esc(raw);
+      const drill = (opts && opts.drill) ? opts.drill(r) : (/^\d{1,3}(\.\d{1,3}){3}$/.test(raw) ? `data-drill="ip" data-ip="${esc(raw)}"` : `data-drill="q" data-q="${esc(raw)}"`);
+      return `<tr ${drill} style="cursor:pointer"><td class="mono">${mark}${label}</td><td>${r.count ?? r.alerts ?? 0}</td>${extra ? "<td>" + esc(r.ips || r.severity || r.country || "") + "</td>" : ""}</tr>`;
+    }).join("") +
     `</tbody></table>`;
 }
 
@@ -1153,6 +1360,115 @@ function hourBars(hours) {
   return `<div class="hours" title="alerts per hour">` +
     hours.map(h => `<i style="height:${Math.max(4, (h.count / max) * 100)}%" title="${esc(h.time)} · ${h.count}"></i>`).join("") +
     `</div>`;
+}
+
+const MITRE_NAME = {
+  T1190: "Exploit public app",
+  T1189: "Drive-by",
+  T1110: "Brute force",
+  "T1110.001": "Password guessing",
+  T1595: "Active scanning",
+  "T1595.002": "Wordlist scan",
+  "T1595.003": "Wordlist scan",
+  T1498: "Network flood",
+  T1499: "Endpoint flood",
+  "T1548.003": "Sudo abuse",
+  T1565: "Data tamper",
+  T1068: "Privilege escape",
+  T1550: "Stolen token",
+  T1105: "Tool transfer",
+  T1556: "Auth modify",
+  "T1552.001": "Loose credentials",
+  T1589: "Identity gather",
+  T1082: "System discovery",
+};
+const MITRE_TACTIC = {
+  T1190: "Initial access", T1189: "Initial access",
+  T1110: "Credential access", "T1110.001": "Credential access",
+  T1595: "Recon", "T1595.002": "Recon", "T1595.003": "Recon",
+  T1498: "Impact", T1499: "Impact",
+  "T1548.003": "Privilege", T1068: "Privilege",
+  T1565: "Impact", T1550: "Lateral", T1105: "Command",
+  T1556: "Persistence", "T1552.001": "Credential access",
+  T1589: "Recon", T1082: "Discovery",
+};
+
+function sevColor(s) {
+  return { critical: "#e24a3b", high: "#e07a2f", medium: "#d4a054", low: "#6b9e7a" }[s] || "#8a8274";
+}
+
+function mixBars(rows, opts) {
+  if (!rows || !rows.length) return `<div class="empty">Nothing in this window</div>`;
+  const max = Math.max(1, ...rows.map(r => r.count || 0));
+  return `<div class="mix">` + rows.map(r => {
+    const label = (opts && opts.label) ? opts.label(r) : (r.name || r.id);
+    const col = (opts && opts.color) ? opts.color(r) : catColor(r.name);
+    const icon = (opts && opts.icon) ? opts.icon(r) : "";
+    const tip = (opts && opts.tip) ? opts.tip(r) : "Click to search";
+    const drill = (opts && opts.drill) ? opts.drill(r) : "";
+    return `<div class="mix-row" ${drill} title="${esc(tip)}">
+      <div class="mix-lab">${icon}<span>${esc(label)}</span></div>
+      <div class="mix-track"><div class="mix-fill" style="width:${(r.count / max) * 100}%;background:${col}"></div></div>
+      <div class="mix-n">${r.count ?? 0}</div>
+    </div>`;
+  }).join("") + `</div>`;
+}
+
+function stackHours(mix) {
+  if (!mix || !mix.length) return "";
+  const byT = new Map();
+  const cats = [];
+  const seen = new Set();
+  for (const row of mix) {
+    const k = row.time;
+    if (!byT.has(k)) byT.set(k, { time: k, total: 0, parts: {} });
+    const b = byT.get(k);
+    b.parts[row.category] = (b.parts[row.category] || 0) + row.count;
+    b.total += row.count;
+    if (!seen.has(row.category)) { seen.add(row.category); cats.push(row.category); }
+  }
+  const cols = [...byT.values()];
+  const max = Math.max(1, ...cols.map(c => c.total));
+  const every = Math.max(1, Math.ceil(cols.length / 8));
+  return `<div class="stack-wrap"><div class="stack-hours">` +
+    cols.map(c => {
+      const bits = cats.filter(cat => c.parts[cat]).map(cat => {
+        const h = Math.max(3, (c.parts[cat] / max) * 100);
+        return `<i style="height:${h}%;background:${catColor(cat)}" title="${esc(fmtWhen(c.time))} · ${esc(CAT_LABEL[cat] || cat)} · ${c.parts[cat]}"></i>`;
+      }).join("");
+      return `<div class="stack-col" title="${esc(fmtWhen(c.time))} · ${c.total}">${bits}</div>`;
+    }).join("") +
+    `</div><div class="stack-axis">` +
+    cols.map((c, i) => `<span>${(i % every === 0 || i === cols.length - 1) ? esc(fmtTick(c.time)) : ""}</span>`).join("") +
+    `</div></div>
+    <div class="stack-key">${cats.map(c => `<span><i style="background:${catColor(c)}"></i>${esc(CAT_LABEL[c] || c)}</span>`).join("")}</div>`;
+}
+
+function hostStrip(rows) {
+  if (!rows || !rows.length) return `<div class="empty">No host split in this window</div>`;
+  const max = Math.max(1, ...rows.map(r => r.count || 0));
+  return `<div class="host-strip">` + rows.map(r => `
+    <button type="button" class="host-card" data-host="${esc(r.name)}">
+      ${artImg(hostArt(r.name), "host-svg", r.name)}
+      <div class="host-name">${esc(r.name)}</div>
+      <div class="host-n">${r.count}</div>
+      <div class="muted">${r.ips ? r.ips + " IPs" : ""}</div>
+      <div class="mix-track"><div class="mix-fill" style="width:${(r.count / max) * 100}%;background:#33cfff"></div></div>
+    </button>`).join("") + `</div>`;
+}
+
+function countryStrip(rows) {
+  if (!rows || !rows.length) return `<div class="empty">No geo in this window</div>`;
+  const max = Math.max(1, ...rows.map(r => r.count || 0));
+  return `<div class="country-strip">` + rows.map(r => `
+    <div class="country-chip" data-drill="q" data-q="${esc(r.name)}" title="${esc(r.name)} · ${r.count} — click to search">
+      ${artImg(countryArt(r.key, r.name), "art-flag", r.name)}
+      <div>
+        <b>${esc(r.name)}</b>
+        <div class="mix-track"><div class="mix-fill" style="width:${(r.count / max) * 100}%;background:#6b9e7a"></div></div>
+      </div>
+      <span class="mix-n">${r.count}</span>
+    </div>`).join("") + `</div>`;
 }
 
 function cards(list) {
@@ -1186,29 +1502,61 @@ function authEmpty(kind) {
 }
 
 function renderVectorReport(rep) {
+  lastReport = rep;
+  paintReportWindow(rep);
+  const high = (rep.by_severity || []).find(s => s.name === "high");
   $("#report-stats").innerHTML = cards([
     ["Alerts", rep.alerts ?? 0],
     ["Attacker IPs", rep.unique_ips ?? 0],
     ["Critical", rep.critical ?? 0, "crit"],
-    ["Categories", (rep.by_category || []).length],
-    ["Rules fired", (rep.by_rule || []).length],
+    ["High", high ? high.count : 0],
+    ["Hosts hit", (rep.by_source || []).length],
     ["Countries", (rep.by_country || []).length],
   ]);
   const rules = (rep.by_rule || []).map(r => ({
-    name: r.title || r.id, count: r.count, severity: r.severity, id: r.id,
+    name: r.title || r.id, count: r.count, severity: r.severity, id: r.id, category: r.category,
   }));
+  const stack = (rep.hour_mix && rep.hour_mix.length) ? stackHours(rep.hour_mix) : hourBars(rep.by_hour);
   $("#report-body").innerHTML =
-    panel("By category", nameTable(rep.by_category, "Category", "IPs")) +
-    panel("Top rules", nameTable(rules, "Rule", "Sev")) +
-    panel("Paths being hit", nameTable(rep.by_path, "Path", "IPs")) +
-    panel("Origin countries", nameTable(rep.by_country, "Country")) +
-    panel("Volume by hour", hourBars(rep.by_hour), "span2") +
+    panel("Volume by hour", stack || `<div class="empty">No hourly buckets yet</div>`, "span2") +
+    panel("What they are doing", mixBars(rep.by_category, {
+      label: r => CAT_LABEL[r.name] || r.name,
+      color: r => catColor(r.name),
+      icon: r => artImg(typeArt(r.name), "art-inline", r.name),
+      drill: r => `data-drill="q" data-q="${esc(r.name)}"`,
+    })) +
+    panel("Severity", mixBars(rep.by_severity, {
+      color: r => sevColor(r.name),
+      label: r => r.name,
+      drill: r => `data-drill="q" data-q="${esc(r.name)}"`,
+    })) +
+    panel("MITRE techniques", mixBars(rep.by_mitre, {
+      label: r => r.name + (MITRE_NAME[r.name] ? " · " + MITRE_NAME[r.name] : ""),
+      color: () => "#7c6cff",
+      tip: r => ((MITRE_TACTIC[r.name] || "") + (MITRE_NAME[r.name] ? " — " + MITRE_NAME[r.name] : "") + " — click to search"),
+      drill: r => `data-drill="q" data-q="${esc(r.name)}"`,
+    })) +
+    panel("By host", hostStrip(rep.by_source), "span2") +
+    panel("Origin countries", countryStrip(rep.by_country), "span2") +
+    panel("Top rules", mixBars(rules, {
+      label: r => r.name,
+      color: r => catColor(r.category),
+      drill: r => `data-drill="q" data-q="${esc(r.name)}"`,
+    })) +
+    panel("Paths being hit", nameTable(rep.by_path, "Path", "IPs", {
+      drill: r => `data-drill="q" data-q="${esc(r.name)}"`,
+    })) +
     panel("Top attacker IPs", nameTable((rep.top_ips || []).map(a => ({
       name: a.src_ip, count: a.alerts, country: a.country || a.last_title || "",
-    })), "IP", "Note"), "span2");
+    })), "IP", "Note", {
+      icon: r => artImg(countryArt(r.country, r.country), "art-flag", r.country),
+      drill: r => `data-drill="ip" data-ip="${esc(r.name)}"`,
+    }), "span2");
 }
 
 function renderAuthReport(rep, kind) {
+  lastReport = rep;
+  paintReportWindow(rep);
   $("#report-stats").innerHTML = cards([
     ["Failures", rep.fails ?? 0, "crit"],
     ["Fails / 1h", rep.fails_1h ?? 0],
@@ -1233,7 +1581,9 @@ function renderAuthReport(rep, kind) {
   $("#report-body").innerHTML =
     panel("Top IPs", nameTable((rep.top_ips || []).map(a => ({
       name: a.src_ip, count: a.count, country: a.country || a.last_user || "",
-    })), "IP", "Geo / user")) +
+    })), "IP", "Geo / user", {
+      icon: r => artImg(countryArt(r.country, r.country), "art-flag", r.country),
+    })) +
     panel("Users", nameTable(rep.by_user, "User")) +
     panel("Paths / services", nameTable(rep.by_path, "Path")) +
     panel("By host", nameTable(rep.by_source, "Source")) +
@@ -1244,6 +1594,11 @@ function renderAuthReport(rep, kind) {
 
 async function refreshReports() {
   markReportChrome();
+  try {
+    const st = await j("/api/settings");
+    const cur = (st && st.settings) || st || {};
+    if (cur.timezone) displayTZ = cur.timezone === "local" ? "local" : "UTC";
+  } catch (_) {}
   const params = new URLSearchParams({ since: reportRange });
   if (selectedSource) params.set("source", selectedSource);
   const box = $("#report-body");
@@ -1279,6 +1634,78 @@ if (reportViews) {
     refreshReports().catch(console.error);
   });
 }
+const reportBody = $("#report-body");
+if (reportBody && !reportBody.dataset.bound) {
+  reportBody.dataset.bound = "1";
+  reportBody.addEventListener("click", (e) => {
+    const host = e.target.closest("[data-host]");
+    if (host) {
+      const name = host.dataset.host;
+      if (!name || name === "(none)") return;
+      selectedSource = name;
+      try { localStorage.setItem("gpesiem.source", selectedSource); } catch (_) {}
+      fillHostSelect();
+      refresh().catch(console.error);
+      return;
+    }
+    const hit = e.target.closest("[data-drill]");
+    if (!hit) return;
+    const kind = hit.dataset.drill;
+    const ip = hit.dataset.ip || "";
+    const q = hit.dataset.q || "";
+    setView("search");
+    if ($("#sip")) $("#sip").value = kind === "ip" ? ip : "";
+    if ($("#sq")) $("#sq").value = kind === "ip" ? "" : q;
+    if ($("#shost")) $("#shost").value = selectedSource || "";
+    runSearch().catch(console.error);
+  });
+}
+async function downloadExport(format) {
+  const params = new URLSearchParams({ since: reportRange, format });
+  if (selectedSource) params.set("source", selectedSource);
+  const path = reportKind === "vectors" ? "/api/export/alerts" : "/api/export/events";
+  if (reportKind !== "vectors") params.set("channel", reportKind);
+  const r = await fetch(path + "?" + params.toString(), { credentials: "same-origin" });
+  if (r.status === 401) { goLogin(); throw new Error("unauthorized"); }
+  if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+  const blob = await r.blob();
+  const cd = r.headers.get("Content-Disposition") || "";
+  const m = /filename="([^"]+)"/.exec(cd);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (m && m[1]) || ("gpesiem-export." + format);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function copyReportSummary() {
+  if (!lastReport || !navigator.clipboard) return;
+  const body = {
+    window: { since: lastReport.since, until: lastReport.until, range: reportRange, source: selectedSource || "all" },
+    alerts: lastReport.alerts,
+    unique_ips: lastReport.unique_ips,
+    critical: lastReport.critical,
+    by_category: lastReport.by_category,
+    by_severity: lastReport.by_severity,
+    by_mitre: lastReport.by_mitre,
+    by_source: lastReport.by_source,
+    by_country: lastReport.by_country,
+    top_ips: lastReport.top_ips,
+    fails: lastReport.fails,
+    channel: lastReport.channel,
+  };
+  navigator.clipboard.writeText(JSON.stringify(body, null, 2)).catch(() => {});
+}
+
+const expCsv = $("#exp-csv");
+if (expCsv) expCsv.addEventListener("click", () => downloadExport("csv").catch(console.error));
+const expJson = $("#exp-json");
+if (expJson) expJson.addEventListener("click", () => downloadExport("json").catch(console.error));
+const expCopy = $("#exp-copy");
+if (expCopy) expCopy.addEventListener("click", () => copyReportSummary());
+
 const reportRangeEl = $("#report-range");
 if (reportRangeEl) {
   reportRangeEl.addEventListener("click", (e) => {
@@ -1593,5 +2020,9 @@ bootAuth().then(() => {
     const box = $("#alerts");
     if (box) box.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
   });
-  setInterval(() => refresh().catch(() => {}), 8000);
+  setInterval(() => {
+    if (document.hidden) return;
+    if (currentView !== "live" && currentView !== "reports") return;
+    refresh().catch(() => {});
+  }, 12000);
 });

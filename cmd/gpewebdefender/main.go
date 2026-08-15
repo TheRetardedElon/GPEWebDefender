@@ -27,7 +27,7 @@ import (
 	"gpewebdefender/rules"
 )
 
-const version = "0.9.5"
+const version = "0.9.14"
 
 func main() {
 	log.SetFlags(0)
@@ -422,7 +422,7 @@ func pruneLoop(ctx context.Context, st *store.Store) {
 
 func liveDBName(base string) bool {
 	switch strings.ToLower(base) {
-	case "gpe-siem.db", "gpewebdefender.db":
+	case "gpewebdefender.db":
 		return true
 	default:
 		return false

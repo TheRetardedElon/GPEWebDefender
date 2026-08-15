@@ -304,6 +304,7 @@ type MapCountry struct {
 // NameCount is a rollup row for reports.
 type NameCount struct {
 	Name  string `json:"name"`
+	Key   string `json:"key,omitempty"`
 	Count int64  `json:"count"`
 	IPs   int64  `json:"ips,omitempty"`
 }
@@ -321,6 +322,13 @@ type HourCount struct {
 	Count int64     `json:"count"`
 }
 
+// HourCat is one hour × category cell for stacked volume.
+type HourCat struct {
+	Time     time.Time `json:"time"`
+	Category string    `json:"category"`
+	Count    int64     `json:"count"`
+}
+
 type AuthIP struct {
 	SrcIP    string    `json:"src_ip"`
 	Count    int64     `json:"count"`
@@ -333,15 +341,22 @@ type AuthIP struct {
 // VectorReport is the attack-vector insight page.
 type VectorReport struct {
 	Since      time.Time   `json:"since"`
+	Until      time.Time   `json:"until"`
+	Bucket     string      `json:"bucket,omitempty"`
+	Timezone   string      `json:"timezone,omitempty"`
 	Source     string      `json:"source,omitempty"`
 	Alerts     int64       `json:"alerts"`
 	UniqueIPs  int64       `json:"unique_ips"`
 	Critical   int64       `json:"critical"`
 	ByCategory []NameCount `json:"by_category"`
+	BySeverity []NameCount `json:"by_severity"`
+	BySource   []NameCount `json:"by_source"`
+	ByMITRE    []NameCount `json:"by_mitre"`
 	ByRule     []RuleCount `json:"by_rule"`
 	ByPath     []NameCount `json:"by_path"`
 	ByCountry  []NameCount `json:"by_country"`
 	ByHour     []HourCount `json:"by_hour"`
+	HourMix    []HourCat   `json:"hour_mix"`
 	TopIPs     []Attacker  `json:"top_ips"`
 }
 
@@ -349,6 +364,7 @@ type VectorReport struct {
 type AuthReport struct {
 	Channel     string         `json:"channel"`
 	Since       time.Time      `json:"since"`
+	Until       time.Time      `json:"until"`
 	Source      string         `json:"source,omitempty"`
 	Fails       int64          `json:"fails"`
 	Fails1h     int64          `json:"fails_1h"`

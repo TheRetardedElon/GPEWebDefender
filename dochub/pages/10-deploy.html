@@ -18,9 +18,10 @@
         <p class="lead">
           Dedicated monitor box + a tiny agent on each host that has access logs.
           Bind the manager to localhost. Do not put real hostnames, IPs, or secrets in docs or git.
+          If you want the script to do this, start at <a href="03-install-and-run.html">03 · Method A</a>. This page is the same thing, written out.
         </p>
         <div class="meta-row">
-          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill live">Reviewed 2026-08-15</span>
           <span class="pill">2 CPU / 2 GB is enough</span>
           <span class="pill warn">Localhost only</span>
         </div>
@@ -73,6 +74,10 @@ flowchart LR
 
       <section class="block" id="manager">
         <h2>Manager (monitor box)</h2>
+        <p>
+          Fast path: <code>sudo ./deploy/install-manager.sh</code> (see <a href="03-install-and-run.html">03</a>).
+          Slow path, so you can see every file:
+        </p>
         <ol>
           <li>Copy the Linux binary to <code>/usr/local/bin/gpewebdefender</code>.</li>
           <li>System user <code>gpesiem</code>, home <code>/var/lib/gpewebdefender</code>.</li>
@@ -115,6 +120,7 @@ WantedBy=multi-user.target</code></pre>
 
       <section class="block" id="agent">
         <h2>Agent (each web host)</h2>
+        <p>Fast path: <code>sudo ./deploy/install-agent.sh --url http://MONITOR:8787 --name web-1 --tail /var/log/nginx/access.log --journal</code></p>
         <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpewebdefender agent \
   --url http://MONITOR_INTERNAL:8787 \
   --token "$(cat /etc/gpewebdefender/token)" \

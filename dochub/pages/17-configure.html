@@ -92,6 +92,21 @@
               <td>Settings → Your account / Operators. First admin is <code>/login</code> or <code>SIEM_ADMIN_*</code>. <a href="18-operator-accounts.html">18</a>.</td>
               <td>Not htpasswd. Not the ingest token.</td>
             </tr>
+            <tr>
+              <td>See a visual breakdown (volume, MITRE, countries, hosts)</td>
+              <td>Reports → <strong>Insight</strong>. 1h / 24h / 7d is a real clock window. Click a bar to Search.</td>
+              <td>Not a second database. Same alerts.</td>
+            </tr>
+            <tr>
+              <td>Give an analyst a file of this window</td>
+              <td>Insight → <strong>CSV</strong> or <strong>JSON</strong>. Session cookie. Attachment. Max 5000 rows. No token, no passwords.</td>
+              <td>Do not wget it from the public internet without login.</td>
+            </tr>
+            <tr>
+              <td>Install without thinking about systemd</td>
+              <td><code>deploy/install-manager.sh</code> and <code>deploy/install-agent.sh</code>. Chapter <a href="03-install-and-run.html">03</a>.</td>
+              <td>Not PM2. systemd already supervises the binary.</td>
+            </tr>
           </tbody>
         </table>
       </section>

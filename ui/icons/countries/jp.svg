@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" width="300" height="400">
+  <defs>
+    <!-- The neon cyber glow filter -->
+    <filter id="jpPreciseStaticGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    
+    <!-- The dot-grid pattern to match your GoPastEarth map aesthetic -->
+    <pattern id="jpPreciseStaticGrid" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.5" fill="#00ff66" opacity="0.4" />
+    </pattern>
+  </defs>
+
+  <g filter="url(#jpPreciseStaticGlow)">
+    <!-- Hokkaido (North Island) -->
+    <path d="M 220,10 L 235,15 L 230,40 L 260,35 L 285,55 L 295,70 L 275,75 L 255,80 L 245,100 L 225,105 L 210,95 L 205,75 L 215,65 L 200,60 L 195,45 L 210,35 Z" 
+          fill="url(#jpPreciseStaticGrid)" 
+          stroke="#00ff66" 
+          stroke-width="1.2" 
+          stroke-linejoin="round" />
+          
+    <!-- Honshu (Main Island) -->
+    <path d="M 215,120 L 225,120 L 220,135 L 235,160 L 230,180 L 250,220 L 240,250 L 255,270 L 245,300 L 235,310 L 225,295 L 210,305 L 180,310 L 165,300 L 150,315 L 135,305 L 115,315 L 90,325 L 75,340 L 60,335 L 75,315 L 95,300 L 120,300 L 135,285 L 150,290 L 165,275 L 160,260 L 175,250 L 190,225 L 180,210 L 195,190 L 200,165 L 210,145 L 205,130 Z" 
+          fill="url(#jpPreciseStaticGrid)" 
+          stroke="#00ff66" 
+          stroke-width="1.2" 
+          stroke-linejoin="round" />
+          
+    <!-- Shikoku (Bottom Right Inner Island) -->
+    <path d="M 120,335 L 140,325 L 150,335 L 145,355 L 125,350 L 110,360 L 105,345 Z" 
+          fill="url(#jpPreciseStaticGrid)" 
+          stroke="#00ff66" 
+          stroke-width="1.2" 
+          stroke-linejoin="round" />
+          
+    <!-- Kyushu (Bottom Left Island) -->
+    <path d="M 60,350 L 70,355 L 65,375 L 55,395 L 40,390 L 35,365 L 20,355 L 25,340 L 45,345 Z" 
+          fill="url(#jpPreciseStaticGrid)" 
+          stroke="#00ff66" 
+          stroke-width="1.2" 
+          stroke-linejoin="round" />
+  </g>
+</svg>

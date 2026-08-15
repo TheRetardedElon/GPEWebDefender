@@ -7,7 +7,7 @@
 # Comma-separate more access logs on --tail if needed.
 
 [Unit]
-Description=gpewebdefender log shipper
+Description=gpesiem log shipper
 After=network.target
 
 [Service]

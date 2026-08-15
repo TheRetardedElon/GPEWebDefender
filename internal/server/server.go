@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,6 +44,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/sources", s.sources)
 	mux.HandleFunc("GET /api/reports/vectors", s.reportVectors)
 	mux.HandleFunc("GET /api/reports/auth", s.reportAuth)
+	mux.HandleFunc("GET /api/export/alerts", s.exportAlerts)
+	mux.HandleFunc("GET /api/export/events", s.exportEvents)
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	mux.HandleFunc("GET /api/search", s.search)
@@ -527,6 +530,133 @@ func (s *Server) reportAuth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, rep)
+}
+
+func (s *Server) exportAlerts(w http.ResponseWriter, r *http.Request) {
+	since, source := reportQuery(r)
+	rows, err := s.Store.ExportAlerts(since, source, 5000)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	name := exportFile("alerts", since, source, r.URL.Query().Get("format"))
+	writeExport(w, r.URL.Query().Get("format"), name, map[string]any{
+		"exported_at": time.Now().UTC(),
+		"since":       since.UTC(),
+		"until":       time.Now().UTC(),
+		"source":      source,
+		"count":       len(rows),
+		"truncated":   len(rows) >= 5000,
+		"alerts":      rows,
+	}, func(cw *csv.Writer) {
+		_ = cw.Write([]string{"num", "time", "severity", "category", "title", "src_ip", "country", "country_name", "method", "url", "status", "rule_id", "source", "mitre", "evidence"})
+		for _, a := range rows {
+			_ = cw.Write([]string{
+				strconv.FormatInt(a.Num, 10), a.Time.UTC().Format(time.RFC3339), a.Severity, a.Category, a.Title,
+				a.SrcIP, a.Country, a.CountryName, a.Method, a.URL, strconv.Itoa(a.Status), a.RuleID, a.Source,
+				strings.Join(a.MITRE, " "), a.Evidence,
+			})
+		}
+	})
+}
+
+func (s *Server) exportEvents(w http.ResponseWriter, r *http.Request) {
+	since, source := reportQuery(r)
+	ch := r.URL.Query().Get("channel")
+	kindFilter := authFilter(ch)
+	rows, err := s.Store.ExportEvents(since, source, kindFilter, 5000)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	name := exportFile("events-"+sanitizeFile(ch), since, source, r.URL.Query().Get("format"))
+	writeExport(w, r.URL.Query().Get("format"), name, map[string]any{
+		"exported_at": time.Now().UTC(),
+		"since":       since.UTC(),
+		"until":       time.Now().UTC(),
+		"source":      source,
+		"channel":     ch,
+		"count":       len(rows),
+		"truncated":   len(rows) >= 5000,
+		"events":      rows,
+	}, func(cw *csv.Writer) {
+		_ = cw.Write([]string{"time", "kind", "outcome", "src_ip", "user", "method", "path", "url", "status", "source", "reason", "host"})
+		for _, e := range rows {
+			_ = cw.Write([]string{
+				e.Time.UTC().Format(time.RFC3339), e.Kind, e.Outcome, e.SrcIP, e.User, e.Method, e.Path, e.URL,
+				strconv.Itoa(e.Status), e.Source, e.Reason, e.Host,
+			})
+		}
+	})
+}
+
+func authFilter(channel string) string {
+	kind, fail := "", ""
+	switch strings.ToLower(channel) {
+	case "linux", "hostauth", "ssh":
+		kind, fail = "kind = 'hostauth'", "(outcome = 'fail' OR status IN (401,403))"
+	case "app", "applogin", "platform":
+		kind, fail = "kind = 'applogin'", "(outcome = 'fail' OR status IN (401,403))"
+	case "tenant", "tenantlogin", "owner", "ownerlogin":
+		kind, fail = "kind = 'tenantlogin'", "(outcome = 'fail' OR status IN (401,403))"
+	case "probes", "secprobe", "sec":
+		return "kind = 'secprobe'"
+	default:
+		kind = "(IFNULL(kind,'') IN ('','web'))"
+		fail = `(status IN (401,403) OR lower(path) LIKE '%login%' OR lower(path) LIKE '%signin%'
+			  OR lower(path) LIKE '%sign-in%' OR lower(path) LIKE '%/auth%'
+			  OR lower(path) LIKE '%wp-login%' OR lower(path) LIKE '%session%')`
+	}
+	return kind + " AND (" + fail + ")"
+}
+
+func exportFile(kind string, since time.Time, source, format string) string {
+	if format != "json" {
+		format = "csv"
+	}
+	win := "24h"
+	d := time.Since(since)
+	switch {
+	case d <= 90*time.Minute:
+		win = "1h"
+	case d <= 30*time.Hour:
+		win = "24h"
+	default:
+		win = "7d"
+	}
+	src := sanitizeFile(source)
+	if src != "" {
+		src = "-" + src
+	}
+	return "gpesiem-" + sanitizeFile(kind) + "-" + win + src + "." + format
+}
+
+func sanitizeFile(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func writeExport(w http.ResponseWriter, format, name string, payload any, csvFn func(*csv.Writer)) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	if format == "json" {
+		w.Header().Set("Content-Type", "application/json")
+		enc := json.NewEncoder(w)
+		enc.SetEscapeHTML(false)
+		_ = enc.Encode(payload)
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	cw := csv.NewWriter(w)
+	csvFn(cw)
+	cw.Flush()
 }
 
 func reportQuery(r *http.Request) (time.Time, string) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>gpesiem — Web Attack Monitor</title>
+  <title>GPEWebDefender — Web Attack Monitor</title>
   <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
     <div class="brand">
       <span class="mark" aria-hidden="true"></span>
       <div>
-        <div class="name">gpesiem</div>
+        <div class="name">GPEWebDefender</div>
         <div class="tag">what's hitting the site</div>
       </div>
     </div>
@@ -110,17 +110,25 @@
   <div id="view-reports" hidden>
     <div class="report-bar">
       <div class="filters" id="report-views">
-        <button type="button" data-report="vectors" class="on">Attack vectors</button>
+        <button type="button" data-report="vectors" class="on">Insight</button>
         <button type="button" data-report="web">Auth · Web</button>
         <button type="button" data-report="linux">Auth · Linux</button>
         <button type="button" data-report="app">Auth · App</button>
         <button type="button" data-report="tenant">Auth · Tenants</button>
         <button type="button" data-report="probes">Probes</button>
       </div>
-      <div class="filters" id="report-range">
-        <button type="button" data-range="1h">1h</button>
-        <button type="button" data-range="24h" class="on">24h</button>
-        <button type="button" data-range="168h">7d</button>
+      <div class="report-tools">
+        <span class="muted" id="report-window"></span>
+        <div class="export-btns">
+          <button type="button" class="map-btn" id="exp-csv" title="Download rows for this window">CSV</button>
+          <button type="button" class="map-btn" id="exp-json" title="Download JSON for this window">JSON</button>
+          <button type="button" class="map-btn" id="exp-copy" title="Copy a summary of this view">Copy</button>
+        </div>
+        <div class="filters" id="report-range">
+          <button type="button" data-range="1h">1h</button>
+          <button type="button" data-range="24h" class="on">24h</button>
+          <button type="button" data-range="168h">7d</button>
+        </div>
       </div>
     </div>
     <section class="stats" id="report-stats"></section>

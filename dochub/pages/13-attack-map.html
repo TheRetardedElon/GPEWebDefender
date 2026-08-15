@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>13 · Attack map — gpesiem</title>
+  <title>13 · Attack map — GPEWebDefender</title>
   <link rel="stylesheet" href="../css/dochub.css" />
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
@@ -16,9 +16,9 @@
       <header class="hero">
         <h1>13 · Attack map</h1>
         <p class="lead">
-          Live arcs from attacker country to the host you are defending.
+          A shot fires from the attacker to the host you are defending — only when that alert happens.
           Same idea as a public “threat map,” without a globe SaaS or a Java stack.
-          It plots <em>alerts we already fired</em> — not a second sensor.
+          It plots <em>alerts we already fired</em> — not a second sensor. No standing tracks.
         </p>
         <div class="meta-row">
           <span class="pill live">Reviewed 2026-08-14</span>
@@ -42,13 +42,13 @@
           <thead><tr><th>Widget</th><th>Source</th></tr></thead>
           <tbody>
             <tr><td>Basemap</td><td>Embedded world plate. Scroll to zoom, drag to pan, <strong>Hosts</strong> zooms to your pins, <strong>World</strong> resets. Hover a pin for country / IP.</td></tr>
-            <tr><td>Attack arcs</td><td>Alert + source IP → country centroid (or city if an MMDB is loaded). Drawn on the same lat/lon grid as the art.</td></tr>
-            <tr><td>Home pulse</td><td><code>--home</code> ISO country or <code>lat,lon</code>. Extra pins via <code>--homes</code></td></tr>
-            <tr><td>Host picker</td><td>Dropdown: one source, or all homes at once. Arcs land on the pin that matches <code>X-SIEM-Source</code>.</td></tr>
+            <tr><td>Attack shot</td><td>On a live alert (SSE, or a new row the poller has not seen). Arc grows from the attacker pin to the matching host, comet at the tip, brief fade on impact — then gone. Nothing stays drawn on that path.</td></tr>
+            <tr><td>Host pins</td><td>Every named home stays on the map (rack / edge / datastore / terminal art). The host dropdown still filters the feed and shots; unselected pins dim. <strong>Hosts</strong> zooms to the selected box, or all of them.</td></tr>
+            <tr><td>Host picker</td><td>Dropdown: one source, or all homes at once. Shots land on the pin that matches <code>X-SIEM-Source</code>.</td></tr>
             <tr><td>Origin countries</td><td>Counts from alerts in the last 24h</td></tr>
             <tr><td>Type key</td><td>Color = category (SQLi, snoop, canary, scanner…). Click to filter map + feed.</td></tr>
-            <tr><td>Live particle</td><td>SSE <code>alert</code> events that have geo. Bright comet + glow arc (drawn in JS — not a static SVG file).</td></tr>
-            <tr><td>Icons</td><td>Embedded <code>ui/icons/</code>: green node = your host, red/amber hex = origin, bird = canary, shield = defended pin, flare = impact.</td></tr>
+            <tr><td>Origin counts</td><td>Last-24h unique origins from <code>GET /api/map</code>. Used for the key / legend, not as standing beams.</td></tr>
+            <tr><td>Icons</td><td>Embedded <code>ui/icons/</code>: host silhouettes, country plates, attack-type marks. Event inspect card and reports reuse the same files. Missing country art falls back to the name only.</td></tr>
           </tbody>
         </table>
         <p class="hint">
@@ -81,9 +81,9 @@ flowchart LR
           <li>Built-in pin table (demo IPs and a few well-known scanner ranges) → ISO country → centroid + slight jitter.</li>
           <li>Optional <code>--geoip /path/to/GeoLite2-City.mmdb</code> (or Country, or a DB-IP MMDB) → real country/city.</li>
         </ol>
-        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>gpesiem serve --tail /var/log/nginx/access.log --home US --geoip /var/lib/gpesiem/GeoLite2-City.mmdb
-gpesiem serve --home 40.7,-74.0 --homes "web-1=40.7,-74.0;edge-eu=51.5,-0.12"
-gpesiem demo --home 40.7,-74.0</code></pre>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>gpewebdefender serve --tail /var/log/nginx/access.log --home US --geoip /var/lib/gpewebdefender/GeoLite2-City.mmdb
+gpewebdefender serve --home 40.7,-74.0 --homes "web-1=40.7,-74.0;edge-eu=51.5,-0.12"
+gpewebdefender demo --home 40.7,-74.0</code></pre>
         <div class="callout info">
           <strong>We do not ship a GeoIP file</strong>
           MaxMind GeoLite2 needs their license (free). DB-IP publishes a country lite MMDB with attribution.
@@ -121,12 +121,12 @@ gpesiem demo --home 40.7,-74.0</code></pre>
         </table>
         <div class="callout warn">
           <strong>Demo is still fake</strong>
-          <code>gpesiem demo</code> invents IPs that are pinned to countries so the map moves.
+          <code>gpewebdefender demo</code> invents IPs that are pinned to countries so the map moves.
           That is not the world attacking you. See <a href="04-demo-vs-live.html">04</a>.
         </div>
       </section>
 
-      <footer class="foot">gpesiem DocHub · 13 · back to <a href="../index.html">hub home</a></footer>
+      <footer class="foot">GPEWebDefender DocHub · 13 · back to <a href="../index.html">hub home</a></footer>
     </main>
   </div>
   <script src="../js/nav.js"></script>

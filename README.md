@@ -4,9 +4,119 @@ A **web-attack monitor**. It sits next to nginx / Caddy / the app, tails access 
 
 It is not Wazuh, not OSSEC, and not a WAF.
 
-The command is `gpewebdefender`. Hosts, tokens, map pins, GeoIP, and log paths are flags or env files — nothing about a specific company or server is compiled in. Copy `deploy/*.example` and fill in *your* values on *your* boxes.
+The command is `gpewebdefender`. Hosts, tokens, map pins, GeoIP, and log paths are flags or env files — nothing about a specific company or server is compiled in.
 
-Docs: [`dochub/index.html`](dochub/index.html), or `/docs/` on a running manager.
+**If you have never run this:** read this file top to bottom once, then do Method A or Method B. Do not skip “Pick a shape.”
+
+Full picture: [`dochub/index.html`](dochub/index.html) or `/docs/` on a running manager. Start at **03 · Install & run**.
+
+---
+
+## Pick a shape
+
+| You have | Install |
+|----------|---------|
+| A laptop and curiosity | `gpewebdefender demo` — fake attacks, not your site |
+| One Linux box that already writes an access log | **All-in-one** — manager tails that log. No agent. |
+| A small extra box + one or more web servers | **Split** — manager on the extra box, one agent per web (or SSH) host |
+
+Do **not** open port 8787 to the internet. Default listen is `127.0.0.1:8787`. Use an SSH tunnel until you put HTTPS + a login in front.
+
+---
+
+## Look first (any OS)
+
+```bat
+go build -o gpewebdefender.exe .\cmd\gpewebdefender
+gpewebdefender.exe demo
+```
+
+Linux:
+
+```sh
+go build -o gpewebdefender ./cmd/gpewebdefender
+./gpewebdefender demo
+```
+
+Open http://127.0.0.1:8787  
+Those map shots are **invented**. See DocHub **04** before you treat a dashboard as reality.
+
+---
+
+## Method A — the script (Linux + systemd)
+
+From this repo, as root. Build a Linux binary first if you are on Windows:
+
+```powershell
+$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"
+go build -o gpewebdefender-linux-amd64 .\cmd\gpewebdefender
+```
+
+**All-in-one** (this box has the access log):
+
+```sh
+chmod +x deploy/install-manager.sh deploy/install-agent.sh
+sudo ./deploy/install-manager.sh --all-in-one \
+  --tail /var/log/nginx/access.log \
+  --journal \
+  --home 40.7,-74.0
+```
+
+**Split** (monitor first, then each web box):
+
+```sh
+# on the monitor
+sudo ./deploy/install-manager.sh --home 40.7,-74.0
+
+# on a web / SSH box
+scp root@MONITOR:/usr/local/bin/gpewebdefender /usr/local/bin/gpewebdefender
+scp root@MONITOR:/etc/gpewebdefender/env /etc/gpewebdefender/env
+sudo ./deploy/install-agent.sh \
+  --url http://MONITOR:8787 \
+  --name web-1 \
+  --tail /var/log/nginx/access.log \
+  --journal
+```
+
+Replace `MONITOR`, `web-1`, and the log path with *your* values.
+
+Then from your laptop:
+
+```sh
+ssh -L 8787:127.0.0.1:8787 user@THEBOX
+```
+
+Open http://127.0.0.1:8787/login and create the first **admin** (a person). That is not the ingest token.
+
+---
+
+## Method B — you type every file
+
+1. Copy the binary to `/usr/local/bin/gpewebdefender` and `chmod +x`.
+2. `useradd --system --home /var/lib/gpewebdefender --shell /usr/sbin/nologin gpewebdefender`
+3. Copy `rules/` and `dochub/` into `/var/lib/gpewebdefender/`.
+4. Copy `deploy/env.example` to `/etc/gpewebdefender/env`. Put a long random `GWD_TOKEN`. Mode `640`.
+5. Copy `deploy/gpewebdefender.service.example` to systemd. Edit home / tail if needed.
+6. `systemctl daemon-reload && systemctl enable --now gpewebdefender`
+7. Other hosts: `deploy/gpewebdefender-agent.service.example` with the **same** token, a stable `--name`, and `--tail` / `--journal`.
+
+Examples live in [`deploy/`](deploy/).
+
+---
+
+## After it is up (do these in order)
+
+1. Tunnel + `/login` → first admin. Or set `SIEM_ADMIN_USER` + `SIEM_ADMIN_PASSWORD` once, then **delete the password line**.
+2. **Settings** → name the dashboard, pin the site (`US` or `40.7,-74.0`), one row per agent `--name`.
+3. **Live** — shots fire only when an alert happens, then they go away.
+4. **Reports → Insight** — 1h / 24h / 7d is a real clock. Click a bar to Search. **CSV** / **JSON** export is that same window (session cookie, no token in the file).
+5. Optional GeoIP: drop a MaxMind / DB-IP `.mmdb` and pass `--geoip`.
+6. Optional HTTPS: `deploy/nginx-gwd.conf.example`. Deny `/api/ingest` on the public vhost. DocHub **15** and **18**.
+7. Optional app denials the access log cannot see: POST JSON to `/api/ingest`. Never send passwords. DocHub **19**.
+
+If the UI is empty: you are not in demo, and no `--tail` / agent has sent a line yet. `journalctl -u gpewebdefender -n 50`.
+
+---
 
 ## What it watches
 
@@ -17,74 +127,24 @@ Anything that shows up in an access log:
 - Secret-file and admin hunting (`.env`, `.git`, phpMyAdmin, wp-login, actuators)
 - Known scanners (sqlmap, nuclei, nikto, ffuf, …)
 - 404 storms, 401/403 hammering, login brute force, request floods
+- Optional: sshd / sudo via `--journal` or `auth.log`
+- Optional: your app POSTs `kind=applogin` / `tenantlogin` / `secprobe`
 
-It **cannot** see POST bodies unless you log them (you usually should not). GET/query/path/UA/status is what access logs give you. That still catches almost every internet scanner and most opportunistic web attacks.
-
-## Run
-
-```bat
-go build -o gpewebdefender.exe .\cmd\gpewebdefender
-gpewebdefender.exe demo
-```
-
-Open http://127.0.0.1:8787
-
-Against a real access log:
-
-```bat
-gpewebdefender.exe serve --tail C:\path\to\access.log --listen 127.0.0.1:8787
-```
-
-From another server:
-
-```bat
-gpewebdefender.exe agent --url http://siem-host:8787 --token SECRET --tail /var/log/nginx/access.log
-```
-
-Manager must be started with the same `--token`.
+It **cannot** see POST bodies unless you log them (you usually should not).
 
 ## Log formats
 
-- nginx / Apache combined (default)
-- nginx / Caddy / Traefik JSON (`remote_addr` / `request_uri` / `status` / …)
-
-JSON access logs are worth switching to. Example nginx snippet:
-
-```nginx
-log_format json_gwd escape=json
-  '{'
-    '"remote_addr":"$remote_addr",'
-    '"request_method":"$request_method",'
-    '"request_uri":"$request_uri",'
-    '"status":$status,'
-    '"body_bytes_sent":$body_bytes_sent,'
-    '"http_user_agent":"$http_user_agent",'
-    '"http_referer":"$http_referer",'
-    '"host":"$host",'
-    '"time_iso8601":"$time_iso8601"'
-  '}';
-access_log /var/log/nginx/access.json json_gwd;
-```
+nginx / Apache combined, or nginx / Caddy / Traefik JSON. JSON is worth switching to. See DocHub **05**.
 
 ## Rules
 
-Built-in: `rules/web.yaml`. Add your own with `--rules path/to/more.yaml`.
-
-```yaml
-rules:
-  - id: web.admin.probe
-    title: Admin path probe
-    severity: medium
-    category: recon
-    fields: [path]
-    pattern: '(?i)^/(admin|backoffice)/'
-```
+Built-in YAML in `rules/`. Extra files: `--rules path/to/more.yaml`. Optional CMS honey: `--rules packs` (loads `packs/cms.yaml`). Not a plugin scanner.
 
 ## Resource target
 
 One static Go binary + SQLite. A dedicated **2 CPU / 2 GB** box is plenty. No JVM, no OpenSearch, no Elasticsearch.
 
-## Publish
+## Publish / build
 
 This tree is the public product. It has no inventory, tokens, or hostnames.
 
@@ -96,4 +156,4 @@ set CGO_ENABLED=0
 go build -o gpewebdefender-linux-amd64 .\cmd\gpewebdefender
 ```
 
-Then `git init` (already done if you cloned) and push to the public remote you choose. Keep live fleet config out of this repository.
+Keep live fleet config out of this repository.

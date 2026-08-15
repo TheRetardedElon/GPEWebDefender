@@ -1,7 +1,9 @@
 package store
 
 import (
+	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -9,14 +11,22 @@ import (
 )
 
 func (s *Store) VectorReport(since time.Time, source string) (event.VectorReport, error) {
+	until := time.Now().UTC()
+	step, bucketName := reportStep(since, until)
 	rep := event.VectorReport{
-		Since:      since,
+		Since:      since.UTC(),
+		Until:      until,
+		Bucket:     bucketName,
 		Source:     source,
 		ByCategory: []event.NameCount{},
+		BySeverity: []event.NameCount{},
+		BySource:   []event.NameCount{},
+		ByMITRE:    []event.NameCount{},
 		ByRule:     []event.RuleCount{},
 		ByPath:     []event.NameCount{},
 		ByCountry:  []event.NameCount{},
 		ByHour:     []event.HourCount{},
+		HourMix:    []event.HourCat{},
 		TopIPs:     []event.Attacker{},
 	}
 	where, args := reportWhere(since, source, "")
@@ -42,6 +52,36 @@ func (s *Store) VectorReport(since time.Time, source string) (event.VectorReport
 		}
 	}
 	rows.Close()
+
+	sevRows, err := s.db.Query(`SELECT COALESCE(NULLIF(severity,''),'medium'), COUNT(*)
+		FROM alerts `+where+` GROUP BY 1 ORDER BY COUNT(*) DESC`, args...)
+	if err != nil {
+		return rep, err
+	}
+	for sevRows.Next() {
+		var n event.NameCount
+		if sevRows.Scan(&n.Name, &n.Count) == nil {
+			rep.BySeverity = append(rep.BySeverity, n)
+		}
+	}
+	sevRows.Close()
+
+	srcRows, err := s.db.Query(`SELECT COALESCE(NULLIF(source,''),'(none)'), COUNT(*), COUNT(DISTINCT src_ip)
+		FROM alerts `+where+` GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 12`, args...)
+	if err != nil {
+		return rep, err
+	}
+	for srcRows.Next() {
+		var n event.NameCount
+		if srcRows.Scan(&n.Name, &n.Count, &n.IPs) == nil {
+			rep.BySource = append(rep.BySource, n)
+		}
+	}
+	srcRows.Close()
+
+	if tags, err := s.mitreRollup(where, args); err == nil {
+		rep.ByMITRE = tags
+	}
 
 	rrows, err := s.db.Query(`SELECT COALESCE(rule_id,''), COALESCE(title,''), COALESCE(severity,''), COALESCE(category,''), COUNT(*)
 		FROM alerts `+where+` GROUP BY rule_id ORDER BY COUNT(*) DESC LIMIT 16`, args...)
@@ -84,23 +124,44 @@ func (s *Store) VectorReport(since time.Time, source string) (event.VectorReport
 			if name == "" {
 				name = iso
 			}
-			rep.ByCountry = append(rep.ByCountry, event.NameCount{Name: name, Count: n})
+			rep.ByCountry = append(rep.ByCountry, event.NameCount{Name: name, Key: iso, Count: n})
 		}
 	}
 	crows.Close()
 
-	hrows, err := s.db.Query(`SELECT (ts / 3600000) * 3600000, COUNT(*)
-		FROM alerts `+where+` GROUP BY 1 ORDER BY 1`, args...)
+	hourArgs := append([]any{step, step}, args...)
+	hrows, err := s.db.Query(`SELECT (ts / ?) * ?, COUNT(*)
+		FROM alerts `+where+` GROUP BY 1 ORDER BY 1`, hourArgs...)
 	if err != nil {
 		return rep, err
 	}
+	var rawHours []event.HourCount
 	for hrows.Next() {
 		var ms, n int64
 		if hrows.Scan(&ms, &n) == nil {
-			rep.ByHour = append(rep.ByHour, event.HourCount{Time: time.UnixMilli(ms).UTC(), Count: n})
+			rawHours = append(rawHours, event.HourCount{Time: time.UnixMilli(ms).UTC(), Count: n})
 		}
 	}
 	hrows.Close()
+	rep.ByHour = fillHours(since, until, step, rawHours)
+
+	mixArgs := append([]any{step, step}, args...)
+	mixRows, err := s.db.Query(`SELECT (ts / ?) * ?, COALESCE(NULLIF(category,''),'web'), COUNT(*)
+		FROM alerts `+where+` GROUP BY 1, 2 ORDER BY 1`, mixArgs...)
+	if err != nil {
+		return rep, err
+	}
+	var rawMix []event.HourCat
+	for mixRows.Next() {
+		var ms int64
+		var h event.HourCat
+		if mixRows.Scan(&ms, &h.Category, &h.Count) == nil {
+			h.Time = time.UnixMilli(ms).UTC()
+			rawMix = append(rawMix, h)
+		}
+	}
+	mixRows.Close()
+	rep.HourMix = fillMix(since, until, step, rawMix)
 
 	ips, err := s.Attackers(since, 12, source)
 	if err != nil {
@@ -113,7 +174,8 @@ func (s *Store) VectorReport(since time.Time, source string) (event.VectorReport
 func (s *Store) AuthReport(channel string, since time.Time, source string) (event.AuthReport, error) {
 	rep := event.AuthReport{
 		Channel:  channel,
-		Since:    since,
+		Since:    since.UTC(),
+		Until:    time.Now().UTC(),
 		Source:   source,
 		ByStatus: map[string]int64{},
 		ByPath:   []event.NameCount{},
@@ -226,6 +288,180 @@ func (s *Store) AuthReport(channel string, since time.Time, source string) (even
 		rep.Recent = append(rep.Recent, e)
 	}
 	return rep, erows.Err()
+}
+
+func reportStep(since, until time.Time) (int64, string) {
+	d := until.Sub(since)
+	switch {
+	case d <= 2*time.Hour:
+		return 5 * 60 * 1000, "5m"
+	case d <= 36*time.Hour:
+		return 60 * 60 * 1000, "1h"
+	default:
+		return 4 * 60 * 60 * 1000, "4h"
+	}
+}
+
+func fillHours(since, until time.Time, step int64, have []event.HourCount) []event.HourCount {
+	if step <= 0 {
+		return have
+	}
+	by := map[int64]int64{}
+	for _, h := range have {
+		by[h.Time.UnixMilli()] = h.Count
+	}
+	start := (since.UTC().UnixMilli() / step) * step
+	end := until.UTC().UnixMilli()
+	out := []event.HourCount{}
+	for t := start; t <= end; t += step {
+		out = append(out, event.HourCount{Time: time.UnixMilli(t).UTC(), Count: by[t]})
+	}
+	return out
+}
+
+func fillMix(since, until time.Time, step int64, have []event.HourCat) []event.HourCat {
+	if step <= 0 {
+		return have
+	}
+	type key struct {
+		t   int64
+		cat string
+	}
+	by := map[key]int64{}
+	cats := []string{}
+	seen := map[string]bool{}
+	for _, h := range have {
+		by[key{h.Time.UnixMilli(), h.Category}] = h.Count
+		if h.Category != "" && !seen[h.Category] {
+			seen[h.Category] = true
+			cats = append(cats, h.Category)
+		}
+	}
+	start := (since.UTC().UnixMilli() / step) * step
+	end := until.UTC().UnixMilli()
+	out := []event.HourCat{}
+	for t := start; t <= end; t += step {
+		got := false
+		for _, cat := range cats {
+			n := by[key{t, cat}]
+			if n == 0 {
+				continue
+			}
+			out = append(out, event.HourCat{Time: time.UnixMilli(t).UTC(), Category: cat, Count: n})
+			got = true
+		}
+		if !got {
+			out = append(out, event.HourCat{Time: time.UnixMilli(t).UTC(), Category: "", Count: 0})
+		}
+	}
+	return out
+}
+
+func (s *Store) ExportAlerts(since time.Time, source string, limit int) ([]event.Alert, error) {
+	if limit <= 0 || limit > 10000 {
+		limit = 5000
+	}
+	where, args := reportWhere(since, source, "")
+	args = append(args, limit)
+	rows, err := s.db.Query(`SELECT id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source,
+		COALESCE(country,''), COALESCE(country_name,''), COALESCE(lat,0), COALESCE(lon,0), COALESCE(tags,''), COALESCE(num,0)
+		FROM alerts `+where+` ORDER BY ts DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []event.Alert
+	for rows.Next() {
+		var a event.Alert
+		var ts int64
+		var mitre, tags string
+		if err := rows.Scan(&a.ID, &ts, &a.EventID, &a.RuleID, &a.Title, &a.Severity, &a.Category, &a.SrcIP, &a.Method, &a.URL, &a.Status, &a.UA, &a.Evidence, &mitre, &a.Count, &a.Source,
+			&a.Country, &a.CountryName, &a.Lat, &a.Lon, &tags, &a.Num); err != nil {
+			return nil, err
+		}
+		a.Time = time.UnixMilli(ts).UTC()
+		_ = json.Unmarshal([]byte(mitre), &a.MITRE)
+		_ = json.Unmarshal([]byte(tags), &a.Tags)
+		out = append(out, a)
+	}
+	if out == nil {
+		out = []event.Alert{}
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) ExportEvents(since time.Time, source, kindFilter string, limit int) ([]event.Event, error) {
+	if limit <= 0 || limit > 10000 {
+		limit = 5000
+	}
+	where, args := reportWhere(since, source, kindFilter)
+	args = append(args, limit)
+	rows, err := s.db.Query(`SELECT id, ts, src_ip, method, url, path, query, status, bytes, ua, referer, host, source,
+		COALESCE(user,''), COALESCE(kind,''), COALESCE(outcome,''), COALESCE(reason,'')
+		FROM events `+where+` ORDER BY ts DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []event.Event
+	for rows.Next() {
+		var e event.Event
+		var ts int64
+		if err := rows.Scan(&e.ID, &ts, &e.SrcIP, &e.Method, &e.URL, &e.Path, &e.Query, &e.Status, &e.Bytes, &e.UA, &e.Referer, &e.Host, &e.Source, &e.User, &e.Kind, &e.Outcome, &e.Reason); err != nil {
+			return nil, err
+		}
+		e.Time = time.UnixMilli(ts).UTC()
+		out = append(out, e)
+	}
+	if out == nil {
+		out = []event.Event{}
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) mitreRollup(where string, args []any) ([]event.NameCount, error) {
+	rows, err := s.db.Query(`SELECT mitre FROM alerts `+where+` AND IFNULL(mitre,'') NOT IN ('','null','[]')`, args...)
+	if err != nil {
+		return []event.NameCount{}, err
+	}
+	defer rows.Close()
+	counts := map[string]int64{}
+	for rows.Next() {
+		var raw string
+		if rows.Scan(&raw) != nil {
+			continue
+		}
+		var tags []string
+		if json.Unmarshal([]byte(raw), &tags) != nil {
+			continue
+		}
+		seen := map[string]bool{}
+		for _, t := range tags {
+			t = strings.TrimSpace(t)
+			if t == "" || seen[t] {
+				continue
+			}
+			seen[t] = true
+			counts[t]++
+		}
+	}
+	out := make([]event.NameCount, 0, len(counts))
+	for name, n := range counts {
+		out = append(out, event.NameCount{Name: name, Count: n})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count == out[j].Count {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].Count > out[j].Count
+	})
+	if len(out) > 16 {
+		out = out[:16]
+	}
+	if out == nil {
+		out = []event.NameCount{}
+	}
+	return out, rows.Err()
 }
 
 func reportWhere(since time.Time, source, extra string) (string, []any) {
