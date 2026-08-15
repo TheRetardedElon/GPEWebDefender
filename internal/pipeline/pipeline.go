@@ -22,6 +22,7 @@ type Pipeline struct {
 	Seen    atomic.Int64
 	Fired   atomic.Int64
 	Dropped atomic.Int64
+	Quiet   atomic.Int64 // successful static files we did not store
 }
 
 func (p *Pipeline) IngestLine(line, source string) {
@@ -41,6 +42,10 @@ func (p *Pipeline) IngestLine(line, source string) {
 		ev.Kind = event.KindWeb
 	}
 	ev.ApplyLoginDefaults()
+	if event.QuietStatic(ev) {
+		p.Quiet.Add(1)
+		return
+	}
 	p.Seen.Add(1)
 	if err := p.Store.InsertEvent(ev); err != nil {
 		log.Printf("store event: %v", err)
@@ -83,6 +88,10 @@ func (p *Pipeline) IngestEvent(ev event.Event) {
 		ev.Kind = event.KindWeb
 	}
 	ev.ApplyLoginDefaults()
+	if event.QuietStatic(ev) {
+		p.Quiet.Add(1)
+		return
+	}
 	p.Seen.Add(1)
 	_ = p.Store.InsertEvent(ev)
 	for _, al := range p.Engine.Evaluate(ev) {

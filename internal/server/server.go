@@ -233,7 +233,7 @@ func (s *Server) sources(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	geoip, rules := false, 0
-	var seen, fired, drop int64
+	var seen, fired, drop, quiet int64
 	if s.Pipe != nil {
 		geoip = s.Pipe.Geo != nil && s.Pipe.Geo.HasMMDB()
 		if s.Pipe.Engine != nil {
@@ -242,12 +242,14 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 		seen = s.Pipe.Seen.Load()
 		fired = s.Pipe.Fired.Load()
 		drop = s.Pipe.Dropped.Load()
+		quiet = s.Pipe.Quiet.Load()
 	}
 	writeJSON(w, map[string]any{
 		"ok":    true,
 		"seen":  seen,
 		"fired": fired,
 		"drop":  drop,
+		"quiet": quiet,
 		"rules": rules,
 		"geoip": geoip,
 	})
@@ -275,6 +277,7 @@ func (s *Server) alerts(w http.ResponseWriter, r *http.Request) {
 	after, _ := strconv.ParseInt(q.Get("after"), 10, 64)
 	page, err := s.Store.Alerts(store.AlertQuery{
 		Q: q.Get("q"), Severity: q.Get("severity"), IP: q.Get("ip"), Source: q.Get("source"),
+		Plane: q.Get("plane"),
 		Since: since, Limit: limit, BeforeNum: before, AfterNum: after,
 	})
 	if err != nil {

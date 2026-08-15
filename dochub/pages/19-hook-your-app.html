@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>19 · Hook your app — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>19 · Hook your app (two planes)</h1>
+        <p class="lead">
+          This chapter is for a human who has a website and a monitor box
+          and does not want a lecture. We use a fake company: <strong>ACMECo</strong>.
+          Nothing here is a real customer.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Added 2026-08-15</span>
+          <span class="pill">v0.8.0</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#dumb">The dumb version</a>
+        <a href="#two">Two planes</a>
+        <a href="#need">What you need</a>
+        <a href="#edge">Plane 1 · the agent</a>
+        <a href="#app">Plane 2 · the app POST</a>
+        <a href="#reasons">The reason list</a>
+        <a href="#canary">Plant a canary</a>
+        <a href="#dont">Do not</a>
+        <a href="#check">Checklist</a>
+      </nav>
+
+      <section class="block" id="dumb">
+        <h2>The dumb version (read this first)</h2>
+        <ol>
+          <li>You have a website. Attackers hit it. The website writes a log line every time.</li>
+          <li>A tiny program on that box (the <strong>agent</strong>) reads <em>new</em> log lines and mails them to the monitor. It does not sit in front of the site. It does not block anyone.</li>
+          <li>The monitor is a different box. It looks at the lines. If a line looks like an attack, it shows up on the map.</li>
+          <li>Some attacks never appear in the log (a failed password in a POST body, “user A read user B’s invoice”). For those, <strong>the website itself</strong> sends one tiny JSON postcard to the monitor. Only when something bad happened. Not for every page view.</li>
+        </ol>
+        <div class="callout info">
+          <strong>You do not need a new product</strong>
+          There is no extra webhook SaaS. There is no UDP magic. There is no Java agent.
+          The postcard is <code>POST /api/ingest</code> with the same token the agent already uses.
+        </div>
+        <p>
+          The manager <strong>throws away</strong> boring successes: a <code>200</code> for
+          <code>style.css</code> or <code>/assets/logo.png</code> is not stored and not mapped.
+          A <code>404</code> on that same file still counts. A <code>200</code> on
+          <code>/assets/../.env</code> still counts.
+        </p>
+      </section>
+
+      <section class="block" id="two">
+        <h2>Two planes (why the site stays fast)</h2>
+        <table>
+          <thead><tr><th></th><th>Edge plane</th><th>App plane</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Who</td>
+              <td>The agent, reading nginx / Caddy access logs</td>
+              <td>Your application code</td>
+            </tr>
+            <tr>
+              <td>When</td>
+              <td>Every new log line (the process sleeps until there is one)</td>
+              <td>Only when a security line is crossed</td>
+            </tr>
+            <tr>
+              <td>Good for</td>
+              <td>Internet noise: scanners, <code>/.env</code>, 404 storms, SQLi in the URL</td>
+              <td>Things the log cannot see: failed login, canary, IDOR, bad webhook</td>
+            </tr>
+            <tr>
+              <td>Volume</td>
+              <td>Can be chatty. Cheap. Happens on the web box, parse happens on the monitor.</td>
+              <td>Rare. Rich. Never wait for the monitor to answer.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          ACMECo keeps both. They do <strong>not</strong> rip the agent out of fear.
+          They do <strong>not</strong> send every successful API call from Node.
+        </p>
+      </section>
+
+      <section class="block" id="need">
+        <h2>What ACMECo needs (the shopping list)</h2>
+        <table>
+          <thead><tr><th>Thing</th><th>Who has it</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>A monitor box running <code>serve</code> with a token</td>
+              <td>Ops</td>
+              <td>HTTPS UI is optional. Ingest port only from ACMECo’s web hosts.</td>
+            </tr>
+            <tr>
+              <td>The same token on each agent</td>
+              <td>Ops</td>
+              <td>Generate on the monitor. Never commit it.</td>
+            </tr>
+            <tr>
+              <td>An access log the agent can read</td>
+              <td>The web box</td>
+              <td>nginx / Caddy / Apache combined or JSON. See <a href="05-log-formats.html">05</a>.</td>
+            </tr>
+            <tr>
+              <td>A few lines of app code (optional, but this is the “smart” half)</td>
+              <td>The app team</td>
+              <td>One fire-and-forget POST. No new microservice required.</td>
+            </tr>
+            <tr>
+              <td>A decoy URL on the site (optional)</td>
+              <td>The app or nginx</td>
+              <td><code>/.well-known/siem-canary</code> that 404s. See below.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          There is no special ACMECo API and no signed webhook from us to you.
+          You call us. We do not call you.
+        </p>
+      </section>
+
+      <section class="block" id="edge">
+        <h2>Plane 1 — put the agent on the web box</h2>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpewebdefender agent \
+  --url http://MONITOR:8787 \
+  --token SECRET \
+  --name acme-web-1 \
+  --tail /var/log/nginx/access.log</code></pre>
+        <p>
+          <code>--name</code> is the label in the Hosts dropdown. Use a word, not the public IP.
+          Add <code>--journal</code> if you also want SSH / sudo on that Linux box.
+        </p>
+        <p>
+          The agent starts at the <em>end</em> of the file. It does not re-read history.
+          It batches lines and POSTs them. Then it sleeps. It is not a Java indexer.
+        </p>
+      </section>
+
+      <section class="block" id="app">
+        <h2>Plane 2 — the app sends a postcard (only when it matters)</h2>
+        <p>
+          ACMECo’s login handler already knows the password was wrong.
+          The access log does not. So after they return <code>401</code> to the browser,
+          they fire this and <strong>do not wait</strong> for our reply:
+        </p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>POST /api/ingest
+Authorization: Bearer SECRET
+Content-Type: application/json
+X-SIEM-Source: acme-api
+
+{ "kind": "applogin", "src_ip": "203.0.113.9", "user": "alice",
+  "path": "/login", "status": 401, "outcome": "fail" }</code></pre>
+        <p>When ACMECo’s own code catches a security miss (not a normal page view):</p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>{ "kind": "secprobe", "src_ip": "203.0.113.9",
+  "reason": "idor", "path": "/invoices/999", "status": 403, "user": "alice" }</code></pre>
+        <table>
+          <thead><tr><th>kind</th><th>When ACMECo sends it</th></tr></thead>
+          <tbody>
+            <tr><td><code>applogin</code></td><td>Staff / user login fail (or ok, if they want a ratio)</td></tr>
+            <tr><td><code>tenantlogin</code></td><td>A site-owner login, if they have that idea</td></tr>
+            <tr><td><code>secprobe</code></td><td>Canary, probe, IDOR, webhook, 2FA skip, … (see reasons)</td></tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>Never put these in the JSON</strong>
+          Passwords. Session cookies. API keys. Webhook signatures. Card numbers.
+          File contents. The monitor does not need them and you do not want them on disk.
+        </div>
+        <p>
+          In Node / Go / anything: start the POST and return your 401/403 to the user
+          immediately. If the monitor is down, drop the postcard. The website still works.
+        </p>
+      </section>
+
+      <section class="block" id="reasons">
+        <h2>The <code>reason</code> list (copy-paste for the app team)</h2>
+        <p>Send exactly these strings. The monitor already has a rule for each.</p>
+        <table>
+          <thead><tr><th>reason</th><th>Plain English</th></tr></thead>
+          <tbody>
+            <tr><td><code>canary_hit</code></td><td>Someone requested the decoy URL</td></tr>
+            <tr><td><code>path_probe</code></td><td>URL had <code>../</code>, <code>.env</code>, admin junk</td></tr>
+            <tr><td><code>sensitive_deny</code></td><td>401/403 on a privileged route</td></tr>
+            <tr><td><code>webhook_reject</code></td><td>Bad webhook signature</td></tr>
+            <tr><td><code>auth_rate_limit</code></td><td>Too many logins, you sent 429</td></tr>
+            <tr><td><code>enum_burst</code></td><td>One IP guessed lots of public IDs</td></tr>
+            <tr><td><code>app_deny</code></td><td>A feature said no without credentials</td></tr>
+            <tr><td><code>idor</code></td><td>Alice tried to open Bob’s invoice</td></tr>
+            <tr><td><code>priv_esc</code></td><td>Alice tried to become admin</td></tr>
+            <tr><td><code>key_replay</code></td><td>A stolen or reused key</td></tr>
+            <tr><td><code>ssrf_out</code></td><td>You blocked a fetch to a private IP</td></tr>
+            <tr><td><code>upload_abuse</code></td><td>Hostile upload</td></tr>
+            <tr><td><code>ws_abuse</code></td><td>Socket / live channel abuse</td></tr>
+            <tr><td><code>logic_deny</code></td><td>Negative price, qty cheat, etc.</td></tr>
+            <tr><td><code>stepup_bypass</code></td><td>Tried to skip 2FA</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          If ACMECo cannot detect IDOR yet, they do not send <code>idor</code>.
+          The monitor cannot invent it from nginx. Fix the app, then POST.
+        </p>
+      </section>
+
+      <section class="block" id="canary">
+        <h2>Plant a canary (five minutes)</h2>
+        <ol>
+          <li>Make this URL exist and return 404 or 403: <code>/.well-known/siem-canary</code> (or <code>/__canary__/siem</code>).</li>
+          <li>Do not link it from the real UI. You may list it in <code>robots.txt</code> as <code>Disallow</code> — scanners read that file on purpose.</li>
+          <li>Either the access-log agent will see the GET (plane 1), or the app POSTs <code>reason=canary_hit</code> (plane 2). Both is fine.</li>
+          <li>One hit is enough. If a real customer can click it, you planted it wrong.</li>
+        </ol>
+      </section>
+
+      <section class="block" id="dont">
+        <h2>Do not</h2>
+        <ul>
+          <li>Wait for the monitor before answering the user</li>
+          <li>POST every <code>200 OK</code> from the app</li>
+          <li>Replace the agent with “only async.” Then you miss <code>/.env</code> probes that never reach the app</li>
+          <li>Send logs with UDP only and delete the disk file — drops lose evidence</li>
+          <li>Put a heavy Java agent on the same box that serves customers</li>
+          <li>Write ACMECo’s real hostnames or tokens into this repo</li>
+        </ul>
+      </section>
+
+      <section class="block" id="check">
+        <h2>Checklist (ACMECo ships Friday)</h2>
+        <ol>
+          <li>Monitor up. Token in the env file. Firewall: ingest only from the web box.</li>
+          <li>Agent on the web box. Name <code>acme-web-1</code>. First scanner should appear under Hosts.</li>
+          <li>Open the UI. Live → <strong>Web</strong> if login noise is loud. Reports → vectors / auth / probes.</li>
+          <li>App: fire-and-forget POST for login fails. Confirm Reports → Auth · App.</li>
+          <li>Plant <code>/.well-known/siem-canary</code>. Hit it once from a laptop. Confirm a canary alert.</li>
+          <li>When the app can see IDOR / 2FA skip / bad webhook, POST those reasons. Do not invent them in YAML.</li>
+        </ol>
+        <p>
+          Live filters: severity row, then <strong>Everything / Web / Linux / App login / Tenants / Probes</strong>.
+          That is how SSH and app-login rows stop burying a SQLi.
+        </p>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 19 · back to <a href="../index.html">hub home</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

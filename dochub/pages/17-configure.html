@@ -78,6 +78,11 @@
               <td>Settings will not show or edit the token. That is intentional.</td>
             </tr>
             <tr>
+              <td>Tell the monitor about failed logins / IDOR / canaries the access log cannot see</td>
+              <td>App POSTs JSON to <code>/api/ingest</code>. Fire-and-forget. Chapter <a href="19-hook-your-app.html">19</a>.</td>
+              <td>Not a new webhook product. Same token as the agent. Never send passwords.</td>
+            </tr>
+            <tr>
               <td>Watch WordPress / Drupal / Joomla paths (or use them as extra honey)</td>
               <td><code>--rules packs</code> (loads <code>packs/cms.yaml</code>). Off by default.</td>
               <td>Not a plugin scanner. Paths only.</td>

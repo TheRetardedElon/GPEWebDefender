@@ -64,3 +64,75 @@ rules:
     tags: [secprobe]
     fields: [reason]
     pattern: '^app_deny$'
+
+  - id: sec.idor
+    title: Cross-record access denied (IDOR)
+    severity: high
+    category: authz
+    mitre: [T1190]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^idor$'
+
+  - id: sec.priv_esc
+    title: Privilege escalation attempt
+    severity: high
+    category: authz
+    mitre: [T1068]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^priv_esc$'
+
+  - id: sec.key_replay
+    title: Stolen or replayed API key
+    severity: high
+    category: bypass
+    mitre: [T1550]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^key_replay$'
+
+  - id: sec.ssrf_out
+    title: App blocked an outbound fetch (SSRF)
+    severity: high
+    category: ssrf
+    mitre: [T1190]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^ssrf_out$'
+
+  - id: sec.upload_abuse
+    title: Rejected or abusive file upload
+    severity: high
+    category: rce
+    mitre: [T1105]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^upload_abuse$'
+
+  - id: sec.ws_abuse
+    title: WebSocket / live-channel abuse
+    severity: medium
+    category: dos
+    mitre: [T1499]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^ws_abuse$'
+
+  - id: sec.logic_deny
+    title: Business-logic abuse blocked
+    severity: medium
+    category: tamper
+    mitre: [T1565]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^logic_deny$'
+
+  - id: sec.stepup_bypass
+    title: Step-up / 2FA bypass attempt
+    severity: high
+    category: bypass
+    mitre: [T1556]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^stepup_bypass$'

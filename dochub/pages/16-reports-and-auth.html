@@ -173,11 +173,20 @@ X-SIEM-Source: app-sec
             <tr><td><code>auth_rate_limit</code></td><td>429 on a login route</td><td><code>sec.auth.ratelimit</code></td></tr>
             <tr><td><code>enum_burst</code></td><td>Many public-id lookups from one IP</td><td><code>sec.enum.burst</code></td></tr>
             <tr><td><code>app_deny</code></td><td>A feature refused without credentials</td><td><code>sec.app.deny</code></td></tr>
+            <tr><td><code>idor</code></td><td>User A tried to read user B’s record</td><td><code>sec.idor</code></td></tr>
+            <tr><td><code>priv_esc</code></td><td>Tried to become a more powerful role</td><td><code>sec.priv_esc</code></td></tr>
+            <tr><td><code>key_replay</code></td><td>Stolen or reused API / device key</td><td><code>sec.key_replay</code></td></tr>
+            <tr><td><code>ssrf_out</code></td><td>App blocked a fetch to a private URL</td><td><code>sec.ssrf_out</code></td></tr>
+            <tr><td><code>upload_abuse</code></td><td>Bad or hostile file upload</td><td><code>sec.upload_abuse</code></td></tr>
+            <tr><td><code>ws_abuse</code></td><td>Live socket / channel abuse</td><td><code>sec.ws_abuse</code></td></tr>
+            <tr><td><code>logic_deny</code></td><td>Price / qty / business rule cheated</td><td><code>sec.logic_deny</code></td></tr>
+            <tr><td><code>stepup_bypass</code></td><td>Tried to skip 2FA / step-up</td><td><code>sec.stepup_bypass</code></td></tr>
           </tbody>
         </table>
         <p class="hint">
           Never send tokens, signatures, or request bodies. Access-log canaries
           (<a href="14-snoop-and-canaries.html">14</a>) still work if the app cannot POST.
+          The full “do this like ACMECo” walkthrough is <a href="19-hook-your-app.html">19</a>.
         </p>
       </section>
 

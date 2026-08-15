@@ -192,11 +192,28 @@ func (s *Store) InsertAlert(al *event.Alert) error {
 }
 
 type AlertQuery struct {
-	Q, Severity, IP, Source string
-	Since                   time.Time
-	Limit                   int
-	BeforeNum               int64
-	AfterNum                int64
+	Q, Severity, IP, Source, Plane string
+	Since                          time.Time
+	Limit                          int
+	BeforeNum                      int64
+	AfterNum                       int64
+}
+
+func planeSQL(plane string) string {
+	switch strings.ToLower(strings.TrimSpace(plane)) {
+	case "linux", "hostauth":
+		return "category = 'hostauth'"
+	case "app", "applogin":
+		return "category = 'applogin'"
+	case "tenant", "tenantlogin":
+		return "category = 'tenant'"
+	case "probes", "secprobe":
+		return "category IN ('canary','authz','secprobe','tamper')"
+	case "web":
+		return "IFNULL(category,'') NOT IN ('hostauth','applogin','tenant')"
+	default:
+		return ""
+	}
 }
 
 func (s *Store) Alerts(q AlertQuery) (event.AlertPage, error) {
@@ -220,6 +237,9 @@ func (s *Store) Alerts(q AlertQuery) (event.AlertPage, error) {
 	if q.Source != "" {
 		cond = append(cond, "source = ?")
 		args = append(args, q.Source)
+	}
+	if extra := planeSQL(q.Plane); extra != "" {
+		cond = append(cond, extra)
 	}
 	if q.BeforeNum > 0 {
 		cond = append(cond, "num < ?")

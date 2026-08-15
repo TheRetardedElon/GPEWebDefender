@@ -1,6 +1,8 @@
 const $ = (s, r = document) => r.querySelector(s);
 
 let severity = "all";
+let plane = "";
+try { plane = localStorage.getItem("gpesiem.plane") || ""; } catch (_) {}
 let query = "";
 let seen = new Set();
 
@@ -469,6 +471,7 @@ function renderAlerts() {
 async function fetchAlertPage(extra) {
   const params = new URLSearchParams({ limit: "40" });
   if (severity !== "all") params.set("severity", severity);
+  if (plane) params.set("plane", plane);
   if (query) params.set("q", query);
   Object.entries(extra || {}).forEach(([k, v]) => { if (v != null && v !== "") params.set(k, v); });
   return j("/api/alerts" + hostQS(params));
@@ -637,6 +640,22 @@ $("#filters").addEventListener("click", (e) => {
   loadAlerts("reset").catch(console.error);
   refresh().catch(console.error);
 });
+const planeFilters = $("#plane-filters");
+if (planeFilters) {
+  planeFilters.querySelectorAll("button").forEach(b => {
+    b.classList.toggle("on", (b.dataset.plane || "") === plane);
+  });
+  planeFilters.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    plane = b.dataset.plane || "";
+    try { localStorage.setItem("gpesiem.plane", plane); } catch (_) {}
+    planeFilters.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    alertBuf = [];
+    loadAlerts("reset").catch(console.error);
+    refresh().catch(console.error);
+  });
+}
 
 let t;
 $("#q").addEventListener("input", (e) => {

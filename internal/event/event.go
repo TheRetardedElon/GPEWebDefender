@@ -102,8 +102,62 @@ func NormalizeReason(s string) string {
 		return "enum_burst"
 	case "app_deny", "feature_deny", "app-deny":
 		return "app_deny"
+	case "idor", "id_or", "cross_tenant":
+		return "idor"
+	case "priv_esc", "privesc", "privilege_escalation":
+		return "priv_esc"
+	case "key_replay", "stolen_key", "api_key_replay":
+		return "key_replay"
+	case "ssrf_out", "ssrf", "outbound_ssrf":
+		return "ssrf_out"
+	case "upload_abuse", "upload", "stored_xss":
+		return "upload_abuse"
+	case "ws_abuse", "websocket":
+		return "ws_abuse"
+	case "logic_deny", "business_logic", "price_tamper":
+		return "logic_deny"
+	case "stepup_bypass", "2fa_bypass", "mfa_bypass":
+		return "stepup_bypass"
 	default:
 		return strings.ToLower(strings.TrimSpace(s))
+	}
+}
+
+// QuietStatic is a successful static file (CSS/JS/image) with nothing
+// suspicious in the URL. The manager skips storing and alerting these
+// so a busy site does not fill the disk with "someone loaded style.css".
+func QuietStatic(ev Event) bool {
+	if ev.Kind != "" && ev.Kind != KindWeb {
+		return false
+	}
+	switch ev.Status {
+	case 200, 204, 304:
+	default:
+		return false
+	}
+	blob := strings.ToLower(ev.Path + "?" + ev.Query + " " + ev.Decoded)
+	for _, bad := range []string{"..", "%2e%2e", "union", "<script", "wp-config", ".env", ".git", "passwd"} {
+		if strings.Contains(blob, bad) {
+			return false
+		}
+	}
+	p := strings.ToLower(ev.Path)
+	dot := strings.LastIndex(p, ".")
+	if dot < 0 || strings.Contains(p[dot+1:], "/") {
+		return false
+	}
+	ext := p[dot:]
+	switch ext {
+	case ".css", ".js", ".mjs", ".map", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico",
+		".woff", ".woff2", ".ttf", ".eot", ".otf", ".mp4", ".webm", ".mp3",
+		".txt", ".xml", ".json" /* only as leaf static, not APIs — json often is API; skip */:
+		if ext == ".json" || ext == ".xml" || ext == ".txt" {
+			return strings.Contains(p, "/assets/") || strings.Contains(p, "/static/") ||
+				strings.Contains(p, "/css/") || strings.Contains(p, "/js/")
+		}
+		return true
+	default:
+		return false
 	}
 }
 
