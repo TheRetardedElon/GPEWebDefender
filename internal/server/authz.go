@@ -66,7 +66,7 @@ func openPath(p string) bool {
 	case "/app.css", "/app.js", "/map-basemap.jpg":
 		return true
 	default:
-		return false
+		return strings.HasPrefix(p, "/icons/") && strings.HasSuffix(p, ".svg")
 	}
 }
 

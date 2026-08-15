@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <filter id="shieldGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0.03"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Energy Hull -->
+  <polygon points="50,8 88,22 82,62 50,92 18,62 12,22" 
+           fill="url(#shieldGrad)" 
+           stroke="#00f0ff" 
+           stroke-width="1.5" 
+           stroke-linejoin="round"
+           filter="url(#shieldGlow)"/>
+
+  <!-- Inner Armor Frame -->
+  <polygon points="50,16 80,27 75,58 50,83 25,58 20,27" 
+           fill="none" 
+           stroke="#00f0ff" 
+           stroke-width="0.8" 
+           stroke-dasharray="8 3"
+           stroke-opacity="0.7"/>
+
+  <!-- Tech Hexagon Core Lock -->
+  <polygon points="50,38 62,45 62,59 50,66 38,59 38,45" 
+           fill="#00f0ff" 
+           fill-opacity="0.2" 
+           stroke="#00f0ff" 
+           stroke-width="1.2"
+           filter="url(#shieldGlow)"/>
+
+  <!-- Inner Core Glyph -->
+  <polygon points="50,43 56,47 56,57 50,61 44,57 44,47" 
+           fill="#00f0ff" 
+           fill-opacity="0.85" 
+           filter="url(#shieldGlow)"/>
+
+  <!-- Circuit Traces & Bus Lines -->
+  <g stroke="#00f0ff" stroke-width="1" stroke-linecap="round" filter="url(#shieldGlow)">
+    <line x1="50" y1="16" x2="50" y2="38" />
+    <line x1="50" y1="66" x2="50" y2="83" />
+    <line x1="25" y1="58" x2="38" y2="59" />
+    <line x1="75" y1="58" x2="62" y2="59" />
+    <line x1="32" y1="23" x2="42" y2="33" />
+    <line x1="68" y1="23" x2="58" y2="33" />
+  </g>
+
+  <!-- Node Dots -->
+  <circle cx="50" cy="16" r="1.5" fill="#00f0ff"/>
+  <circle cx="50" cy="83" r="1.5" fill="#00f0ff"/>
+  <circle cx="20" cy="27" r="1.5" fill="#00f0ff"/>
+  <circle cx="80" cy="27" r="1.5" fill="#00f0ff"/>
+</svg>

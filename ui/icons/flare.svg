@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="50" height="50">
+  <defs>
+    <filter id="impactGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <style>
+    .flare {
+      transform-origin: center;
+      animation: burst 0.5s ease-out forwards;
+    }
+    @keyframes burst {
+      0% { transform: scale(0.2) rotate(0deg); opacity: 1; }
+      70% { opacity: 1; }
+      100% { transform: scale(1.2) rotate(45deg); opacity: 0; }
+    }
+  </style>
+
+  <g class="flare" filter="url(#impactGlow)">
+    <!-- Sharp diagonal spikes -->
+    <polygon points="48,10 52,10 52,48 90,48 90,52 52,52 52,90 48,90 48,52 10,52 10,48 48,48" fill="#ffffff" />
+    
+    <!-- Secondary angular shards -->
+    <polygon points="25,25 30,22 50,50 22,30" fill="#ff3333" opacity="0.8"/>
+    <polygon points="75,25 78,30 50,50 70,22" fill="#ff3333" opacity="0.8"/>
+    <polygon points="75,75 70,78 50,50 78,70" fill="#ff3333" opacity="0.8"/>
+    <polygon points="25,75 22,70 50,50 30,78" fill="#ff3333" opacity="0.8"/>
+    
+    <!-- Overload Core -->
+    <circle cx="50" cy="50" r="8" fill="#ffffff" />
+    <circle cx="50" cy="50" r="12" fill="none" stroke="#ff3333" stroke-width="2" />
+  </g>
+</svg>

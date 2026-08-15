@@ -117,9 +117,11 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 		p = "index.html"
 	}
 	// Only embedded UI files — never walk the process cwd.
-	switch p {
-	case "index.html", "app.css", "app.js", "map-basemap.jpg":
-	default:
+	ok := p == "index.html" || p == "app.css" || p == "app.js" || p == "map-basemap.jpg"
+	if strings.HasPrefix(p, "icons/") && strings.HasSuffix(p, ".svg") && !strings.Contains(p, "..") {
+		ok = true
+	}
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -137,6 +139,8 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	case strings.HasSuffix(p, ".jpg"), strings.HasSuffix(p, ".jpeg"):
 		w.Header().Set("Content-Type", "image/jpeg")
+	case strings.HasSuffix(p, ".svg"):
+		w.Header().Set("Content-Type", "image/svg+xml")
 	}
 	_, _ = w.Write(b)
 }

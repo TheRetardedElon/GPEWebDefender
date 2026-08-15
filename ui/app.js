@@ -178,6 +178,40 @@ function catShown(cat) {
   return map.filter.size === 0 || map.filter.has(cat || "web");
 }
 
+const ICONS = {};
+["node-ok.svg", "node-err.svg", "node-warn.svg", "canary.svg", "shield.svg", "flare.svg"].forEach(name => {
+  const im = new Image();
+  im.src = "/icons/" + name;
+  ICONS[name] = im;
+});
+
+function drawIcon(ctx, name, x, y, size) {
+  const im = ICONS[name];
+  if (!im || !im.complete || !im.naturalWidth) return false;
+  ctx.drawImage(im, x - size / 2, y - size / 2, size, size);
+  return true;
+}
+
+function iconForCat(cat) {
+  if (cat === "canary") return "canary.svg";
+  if (cat === "recon" || cat === "scanner" || cat === "snoop") return "node-warn.svg";
+  return "node-err.svg";
+}
+
+function strokeGlow(ctx, x1, y1, cx, cy, x2, y2, col, width, alpha) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo(cx, cy, x2, y2);
+  ctx.strokeStyle = hexA(col, alpha);
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.shadowColor = col;
+  ctx.shadowBlur = 14;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function quadCtrl(x1, y1, x2, y2) {
   const mx = (x1 + x2) / 2;
   const my = (y1 + y2) / 2;
@@ -214,35 +248,53 @@ function drawMap() {
     const col = catColor(a.category);
     const [x1, y1] = project(a.lat, a.lon, w, h);
     const [cx, cy] = quadCtrl(x1, y1, hx, hy);
-    const t = Math.min(1, age / 1400);
-    const fade = age > a.life - 800 ? (a.life - age) / 800 : 1;
+    const t = Math.min(1, age / 1600);
+    const fade = age > a.life - 700 ? (a.life - age) / 700 : 1;
+    ctx.save();
+    ctx.setLineDash([4, 8]);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.quadraticCurveTo(cx, cy, hx, hy);
-    ctx.strokeStyle = hexA(col, 0.18 + 0.45 * fade);
-    ctx.lineWidth = a.severity === "critical" ? 2 : 1.4;
+    ctx.strokeStyle = hexA(col, 0.4 * fade);
+    ctx.lineWidth = 1.3;
     ctx.stroke();
+    ctx.restore();
+    strokeGlow(ctx, x1, y1, cx, cy, hx, hy, col, a.severity === "critical" ? 3.4 : 2.6, 0.7 * fade);
 
     const mt = easeOut(t);
     const px = (1 - mt) * (1 - mt) * x1 + 2 * (1 - mt) * mt * cx + mt * mt * hx;
     const py = (1 - mt) * (1 - mt) * y1 + 2 * (1 - mt) * mt * cy + mt * mt * hy;
+    ctx.save();
+    ctx.shadowColor = "#fff";
+    ctx.shadowBlur = 16;
     ctx.beginPath();
-    ctx.arc(px, py, 2.4, 0, Math.PI * 2);
-    ctx.fillStyle = hexA(col, fade);
+    ctx.arc(px, py, 4.2, 0, Math.PI * 2);
+    ctx.fillStyle = hexA("#ffffff", fade);
     ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, 7, 0, Math.PI * 2);
+    ctx.fillStyle = hexA(col, 0.45 * fade);
+    ctx.fill();
+    ctx.restore();
 
+    const ring = 10 + (now / 8 % 18);
     ctx.beginPath();
-    ctx.arc(x1, y1, 3 + (1 - fade) * 6, 0, Math.PI * 2);
-    ctx.fillStyle = hexA(col, 0.18 * fade);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x1, y1, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = hexA(col, 0.9 * fade);
-    ctx.fill();
+    ctx.arc(x1, y1, ring, 0, Math.PI * 2);
+    ctx.strokeStyle = hexA(col, 0.35 * fade * (1 - (ring - 10) / 18));
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (!drawIcon(ctx, iconForCat(a.category), x1, y1, 22)) {
+      ctx.beginPath();
+      ctx.arc(x1, y1, 4, 0, Math.PI * 2);
+      ctx.fillStyle = hexA(col, 0.95 * fade);
+      ctx.fill();
+    }
+    if (t > 0.72) {
+      drawIcon(ctx, "flare.svg", hx, hy, 28 + (t - 0.72) * 40);
+    }
   }
   map.fly = map.fly.filter(a => now - a.born < a.life);
 
-  // lingering dots — one per IP + type so filters stay honest
   const seen = new Set();
   for (const a of map.arcs) {
     if (!a.country || !catShown(a.category) || !sourceShown(a.source)) continue;
@@ -250,10 +302,12 @@ function drawMap() {
     if (seen.has(k)) continue;
     seen.add(k);
     const [x, y] = project(a.lat, a.lon, w, h);
-    ctx.beginPath();
-    ctx.arc(x, y, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = hexA(catColor(a.category), 0.7);
-    ctx.fill();
+    if (!drawIcon(ctx, iconForCat(a.category), x, y, 18)) {
+      ctx.beginPath();
+      ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+      ctx.fillStyle = hexA(catColor(a.category), 0.9);
+      ctx.fill();
+    }
   }
 
   homes.forEach((h, i) => {
@@ -261,16 +315,14 @@ function drawMap() {
     const col = HOME_PALETTE[i % HOME_PALETTE.length];
     const pulse = 0.5 + 0.5 * Math.sin(now / 400 + i);
     ctx.beginPath();
-    ctx.arc(hx, hy, 10 + pulse * 6, 0, Math.PI * 2);
-    ctx.fillStyle = hexA(col, 0.10);
+    ctx.arc(hx, hy, 16 + pulse * 8, 0, Math.PI * 2);
+    ctx.fillStyle = hexA("#00f0ff", 0.08 + pulse * 0.06);
     ctx.fill();
-    ctx.beginPath();
-    ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
-    ctx.fillStyle = col;
-    ctx.fill();
+    drawIcon(ctx, "shield.svg", hx, hy, 34);
+    drawIcon(ctx, "node-ok.svg", hx, hy, 16);
     ctx.fillStyle = "#e8e2d6";
     ctx.font = "11px Segoe UI, system-ui, sans-serif";
-    ctx.fillText(h.name || "home", hx + 8, hy - 6);
+    ctx.fillText(h.name || "home", hx + 18, hy - 8);
   });
 
   requestAnimationFrame(drawMap);
@@ -690,6 +742,7 @@ if (hostSel) {
 map.canvas = $("#map");
 map.ctx = map.canvas.getContext("2d");
 mapArt.addEventListener("load", () => requestAnimationFrame(drawMap));
+Object.values(ICONS).forEach(im => im.addEventListener("load", () => requestAnimationFrame(drawMap)));
 requestAnimationFrame(drawMap);
 
 const mapTip = $("#map-tip");

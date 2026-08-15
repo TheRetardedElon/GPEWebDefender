@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>13 · Attack map — GPEWebDefender</title>
+  <title>13 · Attack map — gpesiem</title>
   <link rel="stylesheet" href="../css/dochub.css" />
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
@@ -47,7 +47,8 @@
             <tr><td>Host picker</td><td>Dropdown: one source, or all homes at once. Arcs land on the pin that matches <code>X-SIEM-Source</code>.</td></tr>
             <tr><td>Origin countries</td><td>Counts from alerts in the last 24h</td></tr>
             <tr><td>Type key</td><td>Color = category (SQLi, snoop, canary, scanner…). Click to filter map + feed.</td></tr>
-            <tr><td>Live particle</td><td>SSE <code>alert</code> events that have geo</td></tr>
+            <tr><td>Live particle</td><td>SSE <code>alert</code> events that have geo. Bright comet + glow arc (drawn in JS — not a static SVG file).</td></tr>
+            <tr><td>Icons</td><td>Embedded <code>ui/icons/</code>: green node = your host, red/amber hex = origin, bird = canary, shield = defended pin, flare = impact.</td></tr>
           </tbody>
         </table>
         <p class="hint">
@@ -80,9 +81,9 @@ flowchart LR
           <li>Built-in pin table (demo IPs and a few well-known scanner ranges) → ISO country → centroid + slight jitter.</li>
           <li>Optional <code>--geoip /path/to/GeoLite2-City.mmdb</code> (or Country, or a DB-IP MMDB) → real country/city.</li>
         </ol>
-        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>gpewebdefender serve --tail /var/log/nginx/access.log --home US --geoip /var/lib/gpewebdefender/GeoLite2-City.mmdb
-gpewebdefender serve --home 40.7,-74.0 --homes "web-1=40.7,-74.0;edge-eu=51.5,-0.12"
-gpewebdefender demo --home 40.7,-74.0</code></pre>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>gpesiem serve --tail /var/log/nginx/access.log --home US --geoip /var/lib/gpesiem/GeoLite2-City.mmdb
+gpesiem serve --home 40.7,-74.0 --homes "web-1=40.7,-74.0;edge-eu=51.5,-0.12"
+gpesiem demo --home 40.7,-74.0</code></pre>
         <div class="callout info">
           <strong>We do not ship a GeoIP file</strong>
           MaxMind GeoLite2 needs their license (free). DB-IP publishes a country lite MMDB with attribution.
@@ -120,12 +121,12 @@ gpewebdefender demo --home 40.7,-74.0</code></pre>
         </table>
         <div class="callout warn">
           <strong>Demo is still fake</strong>
-          <code>gpewebdefender demo</code> invents IPs that are pinned to countries so the map moves.
+          <code>gpesiem demo</code> invents IPs that are pinned to countries so the map moves.
           That is not the world attacking you. See <a href="04-demo-vs-live.html">04</a>.
         </div>
       </section>
 
-      <footer class="foot">GPEWebDefender DocHub · 13 · back to <a href="../index.html">hub home</a></footer>
+      <footer class="foot">gpesiem DocHub · 13 · back to <a href="../index.html">hub home</a></footer>
     </main>
   </div>
   <script src="../js/nav.js"></script>
