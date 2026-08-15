@@ -32,11 +32,11 @@ func TestHomeISO(t *testing.T) {
 }
 
 func TestParseHomes(t *testing.T) {
-	m, err := ParseHomes("edge=41.88,-87.63;proxy=DE")
+	m, err := ParseHomes("edge=40.7,-74.0;proxy=DE")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m["edge"].Lat != 41.88 || m["edge"].Lon != -87.63 || m["edge"].Name != "edge" {
+	if m["edge"].Lat != 40.7 || m["edge"].Lon != -74.0 || m["edge"].Name != "edge" {
 		t.Fatalf("edge: %+v", m["edge"])
 	}
 	if m["proxy"].Country != "DE" || m["proxy"].Name != "proxy" {

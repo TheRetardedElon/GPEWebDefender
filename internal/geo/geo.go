@@ -119,7 +119,7 @@ func ParseHome(s string) (Loc, error) {
 	return Loc{Lat: lat, Lon: lon, Country: "HOME", Name: "Home", Ok: true}, nil
 }
 
-// ParseHomes parses "edge=41.88,-87.63;proxy=US". Semicolons separate entries
+// ParseHomes parses "edge=40.7,-74.0;proxy=US". Semicolons separate entries
 // because lat,lon already uses a comma.
 func ParseHomes(s string) (map[string]Loc, error) {
 	out := map[string]Loc{}
