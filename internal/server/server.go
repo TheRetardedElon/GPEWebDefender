@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -287,6 +288,12 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
+	}
+	if d, err := time.ParseDuration(st.Retain); err == nil && d > 0 {
+		h := int(d.Hours())
+		if h > 0 && time.Duration(h)*time.Hour == d {
+			st.Retain = fmt.Sprintf("%dh", h)
+		}
 	}
 	writeJSON(w, map[string]any{
 		"settings":  st,

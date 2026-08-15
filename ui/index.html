@@ -107,30 +107,62 @@
 
   <div id="view-settings" hidden>
     <form class="settings" id="settings-form">
-      <p class="hint-box">These save on this manager (SQLite). Bind address and ingest token stay in the process flags / env file — they are not edited here.</p>
-      <div class="field">
-        <label for="set-name">Display name</label>
-        <input id="set-name" name="site_name" maxlength="80" placeholder="GPEWebDefender" />
-      </div>
-      <div class="field">
-        <label for="set-home">Default map home</label>
-        <input id="set-home" name="home" placeholder="US or 40.7,-74.0" />
-      </div>
-      <div class="field">
-        <label for="set-homes">Named homes (one pin per agent --name)</label>
-        <textarea id="set-homes" name="homes" rows="3" placeholder="web-1=40.7,-74.0;edge-eu=DE"></textarea>
-      </div>
-      <div class="field">
-        <label for="set-retain">Keep raw events</label>
-        <input id="set-retain" name="retain" placeholder="168h" />
-      </div>
-      <div class="field">
-        <label for="set-tz">Timestamps</label>
-        <select id="set-tz" name="timezone">
-          <option value="UTC">UTC</option>
-          <option value="local">Browser local</option>
-        </select>
-      </div>
+      <header class="settings-intro">
+        <h2>Settings</h2>
+        <p>How this dashboard looks and how long it keeps logs. The ingest token and listen address stay in the server env file.</p>
+      </header>
+
+      <section class="set-block">
+        <h3>This dashboard</h3>
+        <div class="field">
+          <label for="set-name">Name in the header</label>
+          <input id="set-name" name="site_name" maxlength="80" placeholder="Web Attack Monitor" />
+        </div>
+        <div class="field">
+          <label for="set-tz">Show times as</label>
+          <select id="set-tz" name="timezone">
+            <option value="UTC">UTC</option>
+            <option value="local">My browser’s timezone</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="set-block">
+        <h3>Map — main site</h3>
+        <p class="field-help">Where attack arcs land when a host does not have its own pin. Country code (<code>US</code>) or coordinates (<code>40.7,-74.0</code>).</p>
+        <div class="field">
+          <label for="set-home">Location</label>
+          <input id="set-home" name="home" placeholder="US" autocomplete="off" />
+        </div>
+      </section>
+
+      <section class="set-block">
+        <h3>Map — each host</h3>
+        <p class="field-help">One row per agent name (same as the Hosts dropdown). Leave empty to use the main site pin.</p>
+        <div class="home-head">
+          <span>Host name</span>
+          <span>Location (US or 40.7,-74.0)</span>
+          <span></span>
+        </div>
+        <div id="home-rows"></div>
+        <button type="button" class="btn-quiet" id="home-add">Add a host pin</button>
+      </section>
+
+      <section class="set-block">
+        <h3>Storage</h3>
+        <div class="field">
+          <label for="set-retain">Keep raw request logs for</label>
+          <select id="set-retain" name="retain">
+            <option value="24h">1 day</option>
+            <option value="72h">3 days</option>
+            <option value="168h">7 days</option>
+            <option value="336h">14 days</option>
+            <option value="720h">30 days</option>
+          </select>
+        </div>
+        <p class="field-help">Alerts are kept about four times longer than raw requests.</p>
+      </section>
+
       <div class="settings-meta muted" id="settings-meta"></div>
       <div class="settings-actions">
         <button type="submit">Save</button>

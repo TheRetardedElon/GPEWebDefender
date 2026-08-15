@@ -676,6 +676,45 @@ function setView(v) {
   if (currentView === "settings") loadSettings().catch(console.error);
 }
 
+function parseHomesStr(s) {
+  return String(s || "").split(/[;\n]/).map(part => {
+    part = part.trim();
+    if (!part) return null;
+    const i = part.indexOf("=");
+    if (i < 0) return { name: part, loc: "" };
+    return { name: part.slice(0, i).trim(), loc: part.slice(i + 1).trim() };
+  }).filter(Boolean);
+}
+
+function addHomeRow(name, loc) {
+  const box = $("#home-rows");
+  if (!box) return;
+  const row = document.createElement("div");
+  row.className = "home-row";
+  row.innerHTML = `<input class="hn" placeholder="web-1" value="${esc(name || "")}" />
+    <input class="hl" placeholder="40.7,-74.0" value="${esc(loc || "")}" />
+    <button type="button" class="btn-x" aria-label="Remove">×</button>`;
+  row.querySelector(".btn-x").addEventListener("click", () => row.remove());
+  box.appendChild(row);
+}
+
+function collectHomes() {
+  return [...document.querySelectorAll("#home-rows .home-row")].map(row => {
+    const name = row.querySelector(".hn").value.trim();
+    const loc = row.querySelector(".hl").value.trim();
+    if (!name || !loc) return "";
+    return name + "=" + loc;
+  }).filter(Boolean).join(";");
+}
+
+function retainChoice(raw) {
+  const d = String(raw || "168h");
+  const map = { "24h": "24h", "24h0m0s": "24h", "72h": "72h", "72h0m0s": "72h",
+    "168h": "168h", "168h0m0s": "168h", "336h": "336h", "336h0m0s": "336h",
+    "720h": "720h", "720h0m0s": "720h" };
+  return map[d] || "168h";
+}
+
 async function loadSettings() {
   const data = await j("/api/settings");
   const st = data.settings || {};
@@ -683,16 +722,21 @@ async function loadSettings() {
   if (name) name.value = st.site_name || "";
   const home = $("#set-home");
   if (home) home.value = st.home || "";
-  const homes = $("#set-homes");
-  if (homes) homes.value = st.homes || "";
+  const box = $("#home-rows");
+  if (box) {
+    box.innerHTML = "";
+    const rows = parseHomesStr(st.homes);
+    if (rows.length) rows.forEach(r => addHomeRow(r.name, r.loc));
+    else addHomeRow("", "");
+  }
   const retain = $("#set-retain");
-  if (retain) retain.value = st.retain || "168h";
+  if (retain) retain.value = retainChoice(st.retain);
   const tz = $("#set-tz");
   if (tz) tz.value = st.timezone === "local" ? "local" : "UTC";
   const meta = $("#settings-meta");
   if (meta) {
-    meta.textContent = (data.rules || 0) + " rules · GeoIP " + (data.geoip ? "loaded" : "off") +
-      " · ingest token " + (data.token_set ? "set" : "not set");
+    meta.textContent = (data.rules || 0) + " detection rules · map GeoIP " +
+      (data.geoip ? "is on" : "is off") + " · ingest token " + (data.token_set ? "is set" : "is not set");
   }
   if (st.site_name) {
     const brand = document.querySelector(".brand .name");
@@ -707,7 +751,7 @@ async function saveSettings(ev) {
   const body = {
     site_name: $("#set-name").value.trim(),
     home: $("#set-home").value.trim(),
-    homes: $("#set-homes").value.trim(),
+    homes: collectHomes(),
     retain: $("#set-retain").value.trim(),
     timezone: $("#set-tz").value,
   };
@@ -888,6 +932,8 @@ if (reportRangeEl) {
 
 const settingsForm = $("#settings-form");
 if (settingsForm) settingsForm.addEventListener("submit", saveSettings);
+const homeAdd = $("#home-add");
+if (homeAdd) homeAdd.addEventListener("click", () => addHomeRow("", ""));
 
 const alertList = $("#alerts");
 if (alertList) {

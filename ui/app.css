@@ -54,20 +54,48 @@ button, input { font: inherit; color: inherit; }
 .tabs button.on { color: var(--ink); border-bottom-color: var(--copper); }
 #view-reports[hidden], #view-live[hidden], #view-settings[hidden] { display: none !important; }
 .settings {
-  max-width: 720px; padding: 16px 22px 32px;
-  display: flex; flex-direction: column; gap: 14px;
+  max-width: 760px; padding: 16px 22px 40px;
+  display: flex; flex-direction: column; gap: 18px;
 }
+.settings-intro h2 {
+  margin: 0 0 6px; font-size: 18px; font-weight: 650;
+}
+.settings-intro p { margin: 0; color: var(--muted); max-width: 56ch; }
+.set-block {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px 16px;
+}
+.set-block h3 {
+  margin: 0 0 10px; font-size: 13px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted);
+}
+.field-help { margin: 0 0 10px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.field-help code { color: var(--ink); }
 .field label {
   display: block; color: var(--muted); font-size: 11px;
   letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
 }
 .field input, .field textarea, .field select {
-  width: 100%; background: var(--bg-2); border: 1px solid var(--line);
+  width: 100%; background: var(--bg-3); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px 10px; color: var(--ink);
 }
-.field textarea { font-family: ui-monospace, Consolas, monospace; resize: vertical; }
+.home-head, .home-row {
+  display: grid; grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.3fr) 40px;
+  gap: 8px; align-items: center; margin-bottom: 8px;
+}
+.home-head { color: var(--muted); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.home-row input {
+  width: 100%; background: var(--bg-3); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 10px; color: var(--ink);
+}
+.btn-quiet, .btn-x {
+  background: transparent; border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 10px; color: var(--muted); cursor: pointer;
+}
+.btn-x { width: 36px; height: 36px; padding: 0; }
+.btn-quiet:hover, .btn-x:hover { border-color: var(--copper); color: var(--ink); }
 .settings-actions { display: flex; align-items: center; gap: 12px; }
-.settings-actions button {
+.settings-actions button[type="submit"] {
   background: var(--bg-3); border: 1px solid var(--copper); border-radius: 8px;
   padding: 7px 14px; cursor: pointer; color: var(--ink);
 }
