@@ -26,11 +26,12 @@ type Loc struct {
 
 // Resolver looks up client IPs for the attack map.
 type Resolver struct {
-	mu    sync.RWMutex
-	mmdb  *maxminddb.Reader
-	pins  map[string]string // exact IP → ISO
-	home  Loc
-	homes map[string]Loc // agent --name / X-SIEM-Source → pin
+	mu     sync.RWMutex
+	mmdb   *maxminddb.Reader
+	pins   map[string]string // exact IP → ISO; used only when pinsOn
+	pinsOn bool              // demo command only — never in serve/live
+	home   Loc
+	homes  map[string]Loc // agent --name / X-SIEM-Source → pin
 }
 
 func New() *Resolver {
@@ -39,6 +40,13 @@ func New() *Resolver {
 		home:  mustHome("US"),
 		homes: map[string]Loc{},
 	}
+}
+
+// EnableDemoPins turns on the fake attacker pin table. serve/live must not call this.
+func (r *Resolver) EnableDemoPins() {
+	r.mu.Lock()
+	r.pinsOn = true
+	r.mu.Unlock()
 }
 
 func (r *Resolver) Home() Loc {
@@ -215,6 +223,9 @@ func (r *Resolver) Lookup(ip string) Loc {
 func (r *Resolver) pin(ip string) (string, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	if !r.pinsOn {
+		return "", false
+	}
 	iso, ok := r.pins[ip]
 	return iso, ok
 }

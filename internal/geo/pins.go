@@ -1,7 +1,7 @@
 package geo
 
-// defaultPins maps well-known / demo IPs to ISO countries so the live map
-// has global arcs without a GeoIP file. Real traffic should use --geoip.
+// defaultPins maps invented demo IPs to ISO countries so `gpewebdefender demo`
+// can draw arcs with no GeoIP file. serve/live never enable this table.
 func defaultPins() map[string]string {
 	return map[string]string{
 		// demo attackers

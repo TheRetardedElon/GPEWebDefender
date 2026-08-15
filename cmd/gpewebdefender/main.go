@@ -126,9 +126,9 @@ func serveCmd(args []string) {
 	httpSrv := &http.Server{Addr: *listen, Handler: srv.Handler()}
 	go func() {
 		if docs != "" {
-			log.Printf("web attack monitor on http://%s  (%d rules)  docs /docs/", *listen, pipe.Engine.Len())
+			log.Printf("live monitor on http://%s  (%d rules)  docs /docs/  (no simulated feed)", *listen, pipe.Engine.Len())
 		} else {
-			log.Printf("web attack monitor on http://%s  (%d rules)", *listen, pipe.Engine.Len())
+			log.Printf("live monitor on http://%s  (%d rules)  (no simulated feed)", *listen, pipe.Engine.Len())
 		}
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
@@ -147,6 +147,9 @@ func demoCmd(args []string) {
 	every := fs.Duration("every", 900*time.Millisecond, "interval between simulated requests")
 	home := fs.String("home", "US", "map home: ISO country (US, DE) or lat,lon")
 	_ = fs.Parse(args)
+	if liveDBName(filepath.Base(*dbPath)) {
+		log.Fatal("demo will not open a live database name; omit --db or use a *-demo.db file")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -156,6 +159,9 @@ func demoCmd(args []string) {
 		log.Fatal(err)
 	}
 	defer pipe.Store.Close()
+	if pipe.Geo != nil {
+		pipe.Geo.EnableDemoPins()
+	}
 
 	go demo.Run(ctx, *every, func(line string) {
 		pipe.IngestLine(line, "demo")
@@ -357,6 +363,15 @@ func pruneLoop(ctx context.Context, st *store.Store, retain time.Duration) {
 			return
 		case <-t.C:
 		}
+	}
+}
+
+func liveDBName(base string) bool {
+	switch strings.ToLower(base) {
+	case "gpe-siem.db", "gpewebdefender.db":
+		return true
+	default:
+		return false
 	}
 }
 

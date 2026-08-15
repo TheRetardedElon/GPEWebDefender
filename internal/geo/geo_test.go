@@ -4,6 +4,10 @@ import "testing"
 
 func TestPinLookup(t *testing.T) {
 	r := New()
+	if r.Lookup("185.220.101.47").Ok {
+		t.Fatal("pins must stay off unless demo enables them")
+	}
+	r.EnableDemoPins()
 	loc := r.Lookup("185.220.101.47")
 	if !loc.Ok || loc.Country != "DE" {
 		t.Fatalf("pin: %+v", loc)
