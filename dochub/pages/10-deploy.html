@@ -66,8 +66,8 @@ flowchart LR
           </pre>
         </div>
         <p class="diagram-caption">
-          Only machines that write HTTP access logs need an agent.
-          Settlement nodes, build boxes, and databases do not generate web-attack telemetry.
+          HTTP access logs need <code>--tail</code>. Linux SSH/sudo can use <code>--journal</code> on the same agent.
+          A machine with neither does not need an agent. See <a href="17-configure.html">17</a>.
         </p>
       </section>
 
@@ -119,6 +119,7 @@ WantedBy=multi-user.target</code></pre>
   --url http://MONITOR_INTERNAL:8787 \
   --token "$(cat /etc/gpewebdefender/token)" \
   --tail /var/log/nginx/access.log \
+  --journal \
   --name web-1</code></pre>
         <p>
           Prefer a private NIC, VPN, or SSH tunnel over exposing ingest.
