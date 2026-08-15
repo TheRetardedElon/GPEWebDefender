@@ -63,7 +63,7 @@ func openPath(p string) bool {
 	switch p {
 	case "/api/health", "/api/login", "/api/setup", "/api/auth-status", "/login", "/login.html":
 		return true
-	case "/app.css", "/app.js":
+	case "/app.css", "/app.js", "/map-basemap.jpg":
 		return true
 	default:
 		return false

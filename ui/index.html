@@ -46,7 +46,10 @@
         <h2>Live attack map</h2>
         <span class="muted" id="map-meta">waiting for geo…</span>
       </header>
-      <canvas id="map" width="1200" height="420" aria-label="World attack map"></canvas>
+      <div class="map-stage">
+        <canvas id="map" width="1600" height="896" aria-label="World attack map"></canvas>
+        <div class="map-tip" id="map-tip" hidden></div>
+      </div>
       <div class="map-key-row">
         <div class="map-key" id="map-key"></div>
       </div>

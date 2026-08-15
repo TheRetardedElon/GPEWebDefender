@@ -23,7 +23,7 @@
         <div class="meta-row">
           <span class="pill live">Reviewed 2026-08-14</span>
           <span class="pill">Color key · click to filter</span>
-          <span class="pill">Canvas · no API key</span>
+          <span class="pill">Cyber basemap · calibrated lat/lon</span>
           <span class="pill">Optional .mmdb</span>
         </div>
       </header>
@@ -41,7 +41,8 @@
         <table>
           <thead><tr><th>Widget</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td>Attack arcs</td><td>Alert + source IP → country centroid (or city if an MMDB is loaded)</td></tr>
+            <tr><td>Basemap</td><td>Embedded world plate (equirectangular). Hover a pin for country / IP. Click-to-open a region card is later.</td></tr>
+            <tr><td>Attack arcs</td><td>Alert + source IP → country centroid (or city if an MMDB is loaded). Drawn on the same lat/lon grid as the art.</td></tr>
             <tr><td>Home pulse</td><td><code>--home</code> ISO country or <code>lat,lon</code>. Extra pins via <code>--homes</code></td></tr>
             <tr><td>Host picker</td><td>Dropdown: one source, or all homes at once. Arcs land on the pin that matches <code>X-SIEM-Source</code>.</td></tr>
             <tr><td>Origin countries</td><td>Counts from alerts in the last 24h</td></tr>

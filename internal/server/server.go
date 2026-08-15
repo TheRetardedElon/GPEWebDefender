@@ -116,9 +116,9 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 	if p == "" {
 		p = "index.html"
 	}
-	// Only the three embedded files — never walk the process cwd.
+	// Only embedded UI files — never walk the process cwd.
 	switch p {
-	case "index.html", "app.css", "app.js":
+	case "index.html", "app.css", "app.js", "map-basemap.jpg":
 	default:
 		http.NotFound(w, r)
 		return
@@ -135,6 +135,8 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	case strings.HasSuffix(p, ".js"):
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	case strings.HasSuffix(p, ".jpg"), strings.HasSuffix(p, ".jpeg"):
+		w.Header().Set("Content-Type", "image/jpeg")
 	}
 	_, _ = w.Write(b)
 }

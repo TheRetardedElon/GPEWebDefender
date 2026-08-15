@@ -128,34 +128,36 @@ let selectedSource = "";
 try { selectedSource = localStorage.getItem("gpesiem.source") || ""; } catch (_) {}
 let sourceList = [];
 
+/* Calibrated to ui/map-basemap.jpg (equirectangular land, HUD padding). */
+const MAP_PROJ = { padX: 0.052, padTop: 0.086, padBot: 0.108, latMax: 83, latMin: -55 };
+const MAP_ASPECT = 895 / 1600;
+
 function project(lat, lon, w, h) {
-  return [(lon + 180) / 360 * w, (90 - lat) / 180 * h];
+  const p = MAP_PROJ;
+  const x = p.padX + (lon + 180) / 360 * (1 - 2 * p.padX);
+  const y = p.padTop + (p.latMax - lat) / (p.latMax - p.latMin) * (1 - p.padTop - p.padBot);
+  return [x * w, y * h];
 }
 
-function catColor(cat) {
-  return CAT_COLOR[cat] || "#8a8274";
-}
-
-function catShown(cat) {
-  return map.filter.size === 0 || map.filter.has(cat || "web");
-}
+const mapArt = new Image();
+mapArt.decoding = "async";
+mapArt.src = "/map-basemap.jpg";
 
 function drawLand(ctx, w, h) {
-  ctx.fillStyle = "#0c0b09";
+  ctx.fillStyle = "#050807";
   ctx.fillRect(0, 0, w, h);
+  if (mapArt.complete && mapArt.naturalWidth) {
+    ctx.drawImage(mapArt, 0, 0, w, h);
+    return;
+  }
   ctx.strokeStyle = "#1c1914";
   ctx.lineWidth = 1;
   for (let lat = -60; lat <= 80; lat += 20) {
     const [, y] = project(lat, 0, w, h);
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
   }
-  for (let lon = -150; lon <= 150; lon += 30) {
-    const [x] = project(0, lon, w, h);
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
   ctx.fillStyle = "#1a1713";
   ctx.strokeStyle = "#2a261f";
-  ctx.lineWidth = 1;
   for (const ring of LAND) {
     ctx.beginPath();
     ring.forEach(([lon, lat], i) => {
@@ -166,6 +168,14 @@ function drawLand(ctx, w, h) {
     ctx.fill();
     ctx.stroke();
   }
+}
+
+function catColor(cat) {
+  return CAT_COLOR[cat] || "#8a8274";
+}
+
+function catShown(cat) {
+  return map.filter.size === 0 || map.filter.has(cat || "web");
 }
 
 function quadCtrl(x1, y1, x2, y2) {
@@ -182,8 +192,8 @@ function drawMap() {
   if (!c) return;
   const ctx = map.ctx;
   const dpr = window.devicePixelRatio || 1;
-  const w = c.clientWidth || 1200;
-  const h = Math.max(280, Math.round(w * 0.34));
+  const w = c.clientWidth || 1600;
+  const h = Math.max(320, Math.round(w * MAP_ASPECT));
   if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
     c.width = Math.round(w * dpr);
     c.height = Math.round(h * dpr);
@@ -340,8 +350,8 @@ function renderMapMeta() {
   const filt = [...map.filter];
   const hostBit = selectedSource ? selectedSource : (shownHomes().length > 1 ? shownHomes().length + " hosts" : "all hosts");
   $("#map-meta").textContent = map.geoip
-    ? (hostBit + " · " + (filt.length ? filt.map(c => CAT_LABEL[c] || c).join(", ") + " · " : "") + vis.length + " arcs")
-    : "no GeoIP file yet — feed still works, map needs a .mmdb";
+    ? (hostBit + " · " + (filt.length ? filt.map(c => CAT_LABEL[c] || c).join(", ") + " · " : "") + vis.length + " origins")
+    : "no GeoIP file yet — feed still works, map needs a .mmdb for real countries";
 
   const counts = {};
   for (const a of map.arcs) {
@@ -679,7 +689,53 @@ if (hostSel) {
 
 map.canvas = $("#map");
 map.ctx = map.canvas.getContext("2d");
+mapArt.addEventListener("load", () => requestAnimationFrame(drawMap));
 requestAnimationFrame(drawMap);
+
+const mapTip = $("#map-tip");
+if (map.canvas && mapTip) {
+  map.canvas.addEventListener("mousemove", (ev) => {
+    const r = map.canvas.getBoundingClientRect();
+    const x = ev.clientX - r.left;
+    const y = ev.clientY - r.top;
+    const w = map.canvas.clientWidth || 1;
+    const h = map.canvas.clientHeight || 1;
+    let best = null, bestD = 22;
+    for (const a of map.arcs) {
+      if (!a.lat && !a.lon) continue;
+      if (!catShown(a.category) || !sourceShown(a.source)) continue;
+      const [px, py] = project(a.lat, a.lon, w, h);
+      const d = Math.hypot(px - x, py - y);
+      if (d < bestD) {
+        bestD = d;
+        best = a;
+      }
+    }
+    for (const home of laidOutHomes()) {
+      const [px, py] = project(home.lat, home.lon, w, h);
+      const d = Math.hypot(px - x, py - y);
+      if (d < bestD) {
+        bestD = d;
+        best = { home: true, name: home.name, lat: home.lat, lon: home.lon };
+      }
+    }
+    if (!best) {
+      mapTip.hidden = true;
+      return;
+    }
+    mapTip.hidden = false;
+    mapTip.style.left = x + "px";
+    mapTip.style.top = y + "px";
+    if (best.home) {
+      mapTip.textContent = (best.name || "home") + " · " + best.lat.toFixed(2) + "," + best.lon.toFixed(2);
+    } else {
+      const where = best.country_name || best.country || best.src_ip || "";
+      mapTip.textContent = (best.src_ip || "") + (where ? " · " + where : "") +
+        (best.category ? " · " + (CAT_LABEL[best.category] || best.category) : "");
+    }
+  });
+  map.canvas.addEventListener("mouseleave", () => { mapTip.hidden = true; });
+}
 
 document.addEventListener("click", (e) => {
   const b = e.target.closest("#map-key .key");
