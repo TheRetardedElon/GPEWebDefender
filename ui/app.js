@@ -329,11 +329,11 @@ function drawMap() {
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.quadraticCurveTo(cx, cy, hx, hy);
-    ctx.strokeStyle = hexA(col, 0.38);
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = hexA(col, 0.55);
+    ctx.lineWidth = 1.8;
     ctx.stroke();
     ctx.restore();
-    strokeGlow(ctx, x1, y1, cx, cy, hx, hy, col, 2.1, 0.32);
+    strokeGlow(ctx, x1, y1, cx, cy, hx, hy, col, 2.8, 0.5);
   }
 
   for (const a of map.fly) {
@@ -346,32 +346,36 @@ function drawMap() {
     const col = catColor(a.category);
     const [x1, y1] = project(a.lat, a.lon, w, h);
     const [cx, cy] = quadCtrl(x1, y1, hx, hy);
-    const t = Math.min(1, age / 1600);
-    const fade = age > a.life - 700 ? (a.life - age) / 700 : 1;
-    ctx.save();
-    ctx.setLineDash([4, 8]);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.quadraticCurveTo(cx, cy, hx, hy);
-    ctx.strokeStyle = hexA(col, 0.4 * fade);
-    ctx.lineWidth = 1.3;
-    ctx.stroke();
-    ctx.restore();
-    strokeGlow(ctx, x1, y1, cx, cy, hx, hy, col, a.severity === "critical" ? 3.4 : 2.6, 0.7 * fade);
+    const travel = 1300;
+    const t = Math.min(1, age / travel);
+    const fade = age > a.life - 500 ? Math.max(0, (a.life - age) / 500) : 1;
+    strokeGlow(ctx, x1, y1, cx, cy, hx, hy, col, a.severity === "critical" ? 4.2 : 3.2, 0.85 * fade);
 
-    const mt = easeOut(t);
-    const px = (1 - mt) * (1 - mt) * x1 + 2 * (1 - mt) * mt * cx + mt * mt * hx;
-    const py = (1 - mt) * (1 - mt) * y1 + 2 * (1 - mt) * mt * cy + mt * mt * hy;
+    const qpt = (tt) => {
+      const u = easeOut(Math.max(0, Math.min(1, tt)));
+      return [
+        (1 - u) * (1 - u) * x1 + 2 * (1 - u) * u * cx + u * u * hx,
+        (1 - u) * (1 - u) * y1 + 2 * (1 - u) * u * cy + u * u * hy,
+      ];
+    };
     ctx.save();
-    ctx.shadowColor = "#fff";
-    ctx.shadowBlur = 16;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 22;
+    for (let k = 6; k >= 1; k--) {
+      const [tx, ty] = qpt(t - k * 0.035);
+      ctx.beginPath();
+      ctx.arc(tx, ty, 2 + k * 0.7, 0, Math.PI * 2);
+      ctx.fillStyle = hexA(col, 0.12 * fade * k);
+      ctx.fill();
+    }
+    const [px, py] = qpt(t);
     ctx.beginPath();
-    ctx.arc(px, py, 4.2, 0, Math.PI * 2);
-    ctx.fillStyle = hexA("#ffffff", fade);
+    ctx.arc(px, py, 10, 0, Math.PI * 2);
+    ctx.fillStyle = hexA(col, 0.55 * fade);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(px, py, 7, 0, Math.PI * 2);
-    ctx.fillStyle = hexA(col, 0.45 * fade);
+    ctx.arc(px, py, 5, 0, Math.PI * 2);
+    ctx.fillStyle = hexA("#ffffff", fade);
     ctx.fill();
     ctx.restore();
 
@@ -426,6 +430,7 @@ function drawMap() {
   });
 
   ctx.restore();
+  replayShots(false);
   requestAnimationFrame(drawMap);
 }
 
@@ -489,9 +494,28 @@ function pushFly(a) {
   map.fly.push({
     ...a,
     born: performance.now(),
-    life: 4200 + Math.random() * 1200,
+    life: 2200 + Math.random() * 400,
   });
   if (map.fly.length > 80) map.fly.shift();
+}
+
+let replayAt = 0;
+function replayShots(force) {
+  const now = performance.now();
+  if (!force && now - replayAt < 7000) return;
+  replayAt = now;
+  const seen = new Set();
+  const list = [];
+  for (const a of map.arcs) {
+    if (!catShown(a.category) || !sourceShown(a.source)) continue;
+    if (!a.lat && !a.lon) continue;
+    const k = (a.src_ip || "") + "|" + (a.category || "") + "|" + (a.source || "");
+    if (seen.has(k)) continue;
+    seen.add(k);
+    list.push(a);
+    if (list.length >= 18) break;
+  }
+  list.forEach((a, i) => setTimeout(() => pushFly(a), i * 160));
 }
 
 function visibleArcs() {
@@ -756,6 +780,7 @@ async function refresh() {
   map.geoip = !!feed.geoip;
   map.arcs = feed.arcs || [];
   map.countries = feed.countries || [];
+  replayShots(true);
   sourceList = (srcs && srcs.sources) || [];
   fillHostSelect();
   renderStats(st);
