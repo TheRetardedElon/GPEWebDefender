@@ -44,10 +44,16 @@
     <div class="map-panel">
       <header>
         <h2>Live attack map</h2>
-        <span class="muted" id="map-meta">waiting for geo…</span>
+        <div class="map-tools">
+          <button type="button" class="map-btn" id="map-zin" title="Zoom in">+</button>
+          <button type="button" class="map-btn" id="map-zout" title="Zoom out">−</button>
+          <button type="button" class="map-btn" id="map-fit" title="Zoom to your hosts">Hosts</button>
+          <button type="button" class="map-btn" id="map-reset" title="Whole world">World</button>
+          <span class="muted" id="map-meta">waiting for geo…</span>
+        </div>
       </header>
       <div class="map-stage">
-        <canvas id="map" width="1600" height="896" aria-label="World attack map"></canvas>
+        <canvas id="map" width="1600" height="400" aria-label="World attack map"></canvas>
         <div class="map-tip" id="map-tip" hidden></div>
       </div>
       <div class="map-key-row">

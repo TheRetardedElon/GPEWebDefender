@@ -128,15 +128,82 @@ let selectedSource = "";
 try { selectedSource = localStorage.getItem("gpesiem.source") || ""; } catch (_) {}
 let sourceList = [];
 
-/* Calibrated to ui/map-basemap.jpg (equirectangular land, HUD padding). */
-const MAP_PROJ = { padX: 0.052, padTop: 0.086, padBot: 0.108, latMax: 83, latMin: -55 };
+/* Calibrated to ui/map-basemap.jpg. NA is drawn a bit south of true
+   equirectangular on this plate, so mid-US latitudes get a small bias. */
+const MAP_PROJ = { padX: 0.045, padTop: 0.10, padBot: 0.07, latMax: 84, latMin: -56 };
 const MAP_ASPECT = 895 / 1600;
+const MAP_VIEW_H = 400;
+
+const mapCam = { z: 1, x: 0, y: 0 };
+const MAP_ZMIN = 1, MAP_ZMAX = 8;
+
+function projectLat(lat, lon) {
+  if (lon > -170 && lon < -50 && lat > 14 && lat < 72) return lat - 6.2;
+  return lat;
+}
 
 function project(lat, lon, w, h) {
   const p = MAP_PROJ;
+  lat = projectLat(lat, lon);
   const x = p.padX + (lon + 180) / 360 * (1 - 2 * p.padX);
   const y = p.padTop + (p.latMax - lat) / (p.latMax - p.latMin) * (1 - p.padTop - p.padBot);
   return [x * w, y * h];
+}
+
+function applyCam(ctx, w, h) {
+  ctx.translate(w / 2 + mapCam.x, h / 2 + mapCam.y);
+  ctx.scale(mapCam.z, mapCam.z);
+  ctx.translate(-w / 2, -h / 2);
+}
+
+function screenToWorld(sx, sy, w, h) {
+  return {
+    x: (sx - w / 2 - mapCam.x) / mapCam.z + w / 2,
+    y: (sy - h / 2 - mapCam.y) / mapCam.z + h / 2,
+  };
+}
+
+function clampCam(w, h) {
+  mapCam.z = Math.min(MAP_ZMAX, Math.max(MAP_ZMIN, mapCam.z));
+  const limX = (w * (mapCam.z - 1)) / 2 + 40;
+  const limY = (h * (mapCam.z - 1)) / 2 + 40;
+  mapCam.x = Math.max(-limX, Math.min(limX, mapCam.x));
+  mapCam.y = Math.max(-limY, Math.min(limY, mapCam.y));
+}
+
+function zoomAt(sx, sy, factor, w, h) {
+  const world = screenToWorld(sx, sy, w, h);
+  mapCam.z *= factor;
+  clampCam(w, h);
+  mapCam.x = sx - (world.x - w / 2) * mapCam.z - w / 2;
+  mapCam.y = sy - (world.y - h / 2) * mapCam.z - h / 2;
+  clampCam(w, h);
+}
+
+function fitHomes() {
+  const c = map.canvas;
+  if (!c) return;
+  const w = c.clientWidth || 1600;
+  const h = Math.min(MAP_VIEW_H, Math.max(280, Math.round(w * MAP_ASPECT)));
+  const homes = laidOutHomes();
+  if (!homes.length) {
+    mapCam.z = 1; mapCam.x = 0; mapCam.y = 0;
+    return;
+  }
+  const pts = homes.map(hm => project(hm.lat, hm.lon, w, h));
+  let minX = pts[0][0], maxX = pts[0][0], minY = pts[0][1], maxY = pts[0][1];
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  const pad = 80;
+  const bw = Math.max(40, maxX - minX + pad * 2);
+  const bh = Math.max(40, maxY - minY + pad * 2);
+  mapCam.z = Math.min(MAP_ZMAX, Math.max(1.4, Math.min(w / bw, h / bh)));
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  mapCam.x = (w / 2 - cx) * mapCam.z;
+  mapCam.y = (h / 2 - cy) * mapCam.z;
+  clampCam(w, h);
 }
 
 const mapArt = new Image();
@@ -227,12 +294,16 @@ function drawMap() {
   const ctx = map.ctx;
   const dpr = window.devicePixelRatio || 1;
   const w = c.clientWidth || 1600;
-  const h = Math.max(320, Math.round(w * MAP_ASPECT));
+  const h = Math.min(MAP_VIEW_H, Math.max(280, Math.round(w * MAP_ASPECT)));
   if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
     c.width = Math.round(w * dpr);
     c.height = Math.round(h * dpr);
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = "#050807";
+  ctx.fillRect(0, 0, w, h);
+  ctx.save();
+  applyCam(ctx, w, h);
   drawLand(ctx, w, h);
 
   const homes = laidOutHomes();
@@ -312,19 +383,22 @@ function drawMap() {
 
   homes.forEach((h, i) => {
     const [hx, hy] = project(h.lat, h.lon, w, h);
-    const col = HOME_PALETTE[i % HOME_PALETTE.length];
-    const pulse = 0.5 + 0.5 * Math.sin(now / 400 + i);
+    const pulse = 0.5 + 0.5 * Math.sin(now / 380 + i);
     ctx.beginPath();
-    ctx.arc(hx, hy, 16 + pulse * 8, 0, Math.PI * 2);
-    ctx.fillStyle = hexA("#00f0ff", 0.08 + pulse * 0.06);
+    ctx.arc(hx, hy, 18 + pulse * 10, 0, Math.PI * 2);
+    ctx.fillStyle = hexA("#00f0ff", 0.12 + pulse * 0.08);
     ctx.fill();
-    drawIcon(ctx, "shield.svg", hx, hy, 34);
-    drawIcon(ctx, "node-ok.svg", hx, hy, 16);
-    ctx.fillStyle = "#e8e2d6";
-    ctx.font = "11px Segoe UI, system-ui, sans-serif";
-    ctx.fillText(h.name || "home", hx + 18, hy - 8);
+    drawIcon(ctx, "shield.svg", hx, hy, 36);
+    const label = h.name || "home";
+    ctx.font = "600 11px Segoe UI, system-ui, sans-serif";
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = "#050807cc";
+    ctx.fillRect(hx + 16, hy - 16, tw + 8, 16);
+    ctx.fillStyle = "#7ee8ff";
+    ctx.fillText(label, hx + 20, hy - 4);
   });
 
+  ctx.restore();
   requestAnimationFrame(drawMap);
 }
 
@@ -735,6 +809,8 @@ if (hostSel) {
     selectedSource = hostSel.value;
     try { localStorage.setItem("gpesiem.source", selectedSource); } catch (_) {}
     alertBuf = [];
+    if (selectedSource) fitHomes();
+    else { mapCam.z = 1; mapCam.x = 0; mapCam.y = 0; }
     refresh().catch(console.error);
   });
 }
@@ -746,49 +822,82 @@ Object.values(ICONS).forEach(im => im.addEventListener("load", () => requestAnim
 requestAnimationFrame(drawMap);
 
 const mapTip = $("#map-tip");
-if (map.canvas && mapTip) {
-  map.canvas.addEventListener("mousemove", (ev) => {
-    const r = map.canvas.getBoundingClientRect();
-    const x = ev.clientX - r.left;
-    const y = ev.clientY - r.top;
-    const w = map.canvas.clientWidth || 1;
-    const h = map.canvas.clientHeight || 1;
-    let best = null, bestD = 22;
-    for (const a of map.arcs) {
-      if (!a.lat && !a.lon) continue;
-      if (!catShown(a.category) || !sourceShown(a.source)) continue;
-      const [px, py] = project(a.lat, a.lon, w, h);
-      const d = Math.hypot(px - x, py - y);
-      if (d < bestD) {
-        bestD = d;
-        best = a;
-      }
-    }
-    for (const home of laidOutHomes()) {
-      const [px, py] = project(home.lat, home.lon, w, h);
-      const d = Math.hypot(px - x, py - y);
-      if (d < bestD) {
-        bestD = d;
-        best = { home: true, name: home.name, lat: home.lat, lon: home.lon };
-      }
-    }
-    if (!best) {
-      mapTip.hidden = true;
-      return;
-    }
-    mapTip.hidden = false;
-    mapTip.style.left = x + "px";
-    mapTip.style.top = y + "px";
-    if (best.home) {
-      mapTip.textContent = (best.name || "home") + " · " + best.lat.toFixed(2) + "," + best.lon.toFixed(2);
-    } else {
-      const where = best.country_name || best.country || best.src_ip || "";
-      mapTip.textContent = (best.src_ip || "") + (where ? " · " + where : "") +
-        (best.category ? " · " + (CAT_LABEL[best.category] || best.category) : "");
-    }
+if (map.canvas) {
+  const cnv = map.canvas;
+  let dragging = false, lastX = 0, lastY = 0;
+  cnv.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const r = cnv.getBoundingClientRect();
+    const w = cnv.clientWidth || 1, h = cnv.clientHeight || 1;
+    zoomAt(ev.clientX - r.left, ev.clientY - r.top, ev.deltaY > 0 ? 0.88 : 1.14, w, h);
+  }, { passive: false });
+  cnv.addEventListener("mousedown", (ev) => {
+    if (ev.button !== 0) return;
+    dragging = true;
+    lastX = ev.clientX; lastY = ev.clientY;
+    cnv.classList.add("drag");
   });
-  map.canvas.addEventListener("mouseleave", () => { mapTip.hidden = true; });
+  window.addEventListener("mouseup", () => { dragging = false; cnv.classList.remove("drag"); });
+  window.addEventListener("mousemove", (ev) => {
+    if (!dragging) return;
+    mapCam.x += ev.clientX - lastX;
+    mapCam.y += ev.clientY - lastY;
+    lastX = ev.clientX; lastY = ev.clientY;
+    const w = cnv.clientWidth || 1, h = cnv.clientHeight || 1;
+    clampCam(w, h);
+  });
+  if (mapTip) {
+    cnv.addEventListener("mousemove", (ev) => {
+      if (dragging) { mapTip.hidden = true; return; }
+      const r = cnv.getBoundingClientRect();
+      const sx = ev.clientX - r.left, sy = ev.clientY - r.top;
+      const w = cnv.clientWidth || 1, h = cnv.clientHeight || 1;
+      const wrld = screenToWorld(sx, sy, w, h);
+      let best = null, bestD = 18 / mapCam.z;
+      for (const a of map.arcs) {
+        if (!a.lat && !a.lon) continue;
+        if (!catShown(a.category) || !sourceShown(a.source)) continue;
+        const [px, py] = project(a.lat, a.lon, w, h);
+        const d = Math.hypot(px - wrld.x, py - wrld.y);
+        if (d < bestD) { bestD = d; best = a; }
+      }
+      for (const home of laidOutHomes()) {
+        const [px, py] = project(home.lat, home.lon, w, h);
+        const d = Math.hypot(px - wrld.x, py - wrld.y);
+        if (d < bestD) {
+          bestD = d;
+          best = { home: true, name: home.name, lat: home.lat, lon: home.lon };
+        }
+      }
+      if (!best) { mapTip.hidden = true; return; }
+      mapTip.hidden = false;
+      mapTip.style.left = sx + "px";
+      mapTip.style.top = sy + "px";
+      if (best.home) {
+        mapTip.textContent = (best.name || "home") + " · " + best.lat.toFixed(2) + "," + best.lon.toFixed(2);
+      } else {
+        const where = best.country_name || best.country || "";
+        mapTip.textContent = (best.src_ip || "") + (where ? " · " + where : "") +
+          (best.category ? " · " + (CAT_LABEL[best.category] || best.category) : "");
+      }
+    });
+    cnv.addEventListener("mouseleave", () => { mapTip.hidden = true; });
+  }
 }
+const mapZin = $("#map-zin");
+const mapZout = $("#map-zout");
+if (mapZin) mapZin.addEventListener("click", () => {
+  const c = map.canvas; if (!c) return;
+  zoomAt(c.clientWidth / 2, c.clientHeight / 2, 1.25, c.clientWidth, c.clientHeight);
+});
+if (mapZout) mapZout.addEventListener("click", () => {
+  const c = map.canvas; if (!c) return;
+  zoomAt(c.clientWidth / 2, c.clientHeight / 2, 0.8, c.clientWidth, c.clientHeight);
+});
+const mapFit = $("#map-fit");
+if (mapFit) mapFit.addEventListener("click", () => fitHomes());
+const mapReset = $("#map-reset");
+if (mapReset) mapReset.addEventListener("click", () => { mapCam.z = 1; mapCam.x = 0; mapCam.y = 0; });
 
 document.addEventListener("click", (e) => {
   const b = e.target.closest("#map-key .key");
