@@ -67,3 +67,27 @@ rules:
     pattern: '^LOGIN$'
     # Every fail is stored as an event. This rule also makes a low alert so
     # the live feed is not silent while you wait for a brute window.
+
+  - id: tenant.login.fail
+    title: Tenant / site-owner login failure
+    severity: medium
+    category: tenant
+    mitre: [T1110]
+    methods: [LOGIN]
+    status: [401, 403]
+    fields: [kind]
+    pattern: '^tenantlogin$'
+
+  - id: tenant.login.brute
+    title: Tenant / site-owner login brute force
+    severity: high
+    category: tenant
+    mitre: [T1110]
+    kind: threshold
+    group_by: src_ip
+    methods: [LOGIN]
+    status: [401, 403]
+    fields: [kind]
+    pattern: '^tenantlogin$'
+    count: 6
+    window: 120s

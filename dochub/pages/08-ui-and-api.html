@@ -59,6 +59,7 @@
             <tr><td>GET</td><td><code>/api/stats</code></td><td>token if set</td><td>Dashboard snapshot. Query: <code>source</code></td></tr>
             <tr><td>GET</td><td><code>/api/alerts</code></td><td>token if set</td><td>Paged. Query: <code>q</code> (also <code>#123</code>), <code>severity</code>, <code>ip</code>, <code>source</code>, <code>since</code>, <code>limit</code>, <code>before</code>/<code>after</code> (alert number). Body: <code>{alerts,has_more,oldest_num,newest_num}</code></td></tr>
             <tr><td>GET/PUT</td><td><code>/api/settings</code></td><td>token if set</td><td>Site name, <code>home</code>, <code>homes</code>, <code>retain</code>, <code>timezone</code>. Token and listen stay in flags/env.</td></tr>
+            <tr><td>GET</td><td><code>/api/search</code></td><td>token if set</td><td>FTS5. Query: <code>q</code>, <code>ip</code>, <code>host</code>, <code>source</code>, <code>kind</code>, <code>limit</code>.</td></tr>
             <tr><td>GET</td><td><code>/api/events</code></td><td>token if set</td><td><code>q</code>, <code>ip</code>, <code>source</code>, <code>limit</code></td></tr>
             <tr><td>GET</td><td><code>/api/attackers</code></td><td>token if set</td><td><code>since</code>, <code>limit</code>, <code>source</code></td></tr>
             <tr><td>GET</td><td><code>/api/rules</code></td><td>token if set</td><td>Loaded rule metadata (no regex text)</td></tr>

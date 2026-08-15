@@ -161,8 +161,14 @@ func authNoise(ctx context.Context, emit func(line string)) {
 			ip := ips[i%len(ips)]
 			user := users[i%len(users)]
 			if i%5 == 0 {
-				emit(fmt.Sprintf(`{"kind":"applogin","src_ip":"%s","user":"%s","path":"/api/login","status":401,"outcome":"fail","method":"LOGIN","ua":"Mozilla/5.0"}`,
-					ip, user))
+				kind := "applogin"
+				path := "/api/login"
+				if i%10 == 0 {
+					kind = "tenantlogin"
+					path = "/owner/login"
+				}
+				emit(fmt.Sprintf(`{"kind":"%s","src_ip":"%s","user":"%s","path":"%s","status":401,"outcome":"fail","method":"LOGIN","ua":"Mozilla/5.0"}`,
+					kind, ip, user, path))
 				continue
 			}
 			stamp := time.Now().UTC().Format("Jan 2 15:04:05")

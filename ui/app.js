@@ -78,6 +78,7 @@ const CAT_COLOR = {
   canary: "#f31260",
   hostauth: "#5b9fd4",
   applogin: "#c47ad4",
+  tenant: "#ffb020",
   tamper: "#33cfff",
   bypass: "#7c6cff",
   web: "#8a8274",
@@ -86,7 +87,7 @@ const CAT_LABEL = {
   sqli: "SQLi", xss: "XSS", rce: "RCE", cmdi: "CMDi", ssrf: "SSRF", ssti: "SSTI",
   traversal: "Traversal", injection: "Injection", recon: "Recon", scanner: "Scanner",
   brute: "Brute", dos: "Flood", snoop: "Snoop", canary: "Canary",
-  hostauth: "Linux auth", applogin: "App login",
+  hostauth: "Linux auth", applogin: "App login", tenant: "Tenant login",
   tamper: "Tamper", bypass: "Bypass", web: "Other",
 };
 
@@ -661,14 +662,16 @@ try {
 } catch (_) {}
 
 function setView(v) {
-  currentView = v === "reports" || v === "settings" ? v : "live";
+  currentView = (v === "reports" || v === "settings" || v === "search") ? v : "live";
   try { localStorage.setItem("gpesiem.view", currentView); } catch (_) {}
   const live = $("#view-live");
   const reps = $("#view-reports");
   const sets = $("#view-settings");
+  const sea = $("#view-search");
   if (live) live.hidden = currentView !== "live";
   if (reps) reps.hidden = currentView !== "reports";
   if (sets) sets.hidden = currentView !== "settings";
+  if (sea) sea.hidden = currentView !== "search";
   document.querySelectorAll("#view-tabs [data-view]").forEach(b => {
     b.classList.toggle("on", b.dataset.view === currentView);
   });
@@ -811,6 +814,9 @@ function authEmpty(kind) {
   if (kind === "linux") {
     return `<div class="hint-box">No Linux auth events yet. Point an agent at <code>/var/log/auth.log</code> (or <code>/var/log/secure</code>) with the same token. Only sshd / sudo / login / PAM failures are kept — this is not a general syslog SIEM.</div>`;
   }
+  if (kind === "tenant") {
+    return `<div class="hint-box">No tenant / site-owner login events yet. The app should POST <code>kind=tenantlogin</code> (or <code>kind=applogin</code> with <code>role=tenant</code>). Never send passwords.</div>`;
+  }
   if (kind === "app") {
     return `<div class="hint-box">No application login events yet. Your app should POST JSON to <code>/api/ingest</code> (Bearer token, <code>X-SIEM-Source</code> set). Do not send passwords.<pre style="margin:10px 0 0;white-space:pre-wrap">{
   "kind": "applogin",
@@ -929,6 +935,49 @@ if (reportRangeEl) {
     refreshReports().catch(console.error);
   });
 }
+
+async function runSearch(ev) {
+  if (ev) ev.preventDefault();
+  const params = new URLSearchParams();
+  const q = ($("#sq") && $("#sq").value.trim()) || "";
+  const ip = ($("#sip") && $("#sip").value.trim()) || "";
+  const host = ($("#shost") && $("#shost").value.trim()) || "";
+  const kind = ($("#skind") && $("#skind").value) || "";
+  if (q) params.set("q", q);
+  if (ip) params.set("ip", ip);
+  if (host) params.set("host", host);
+  if (kind) params.set("kind", kind);
+  params.set("limit", "50");
+  const meta = $("#search-meta");
+  const body = $("#search-body");
+  if (!q && !ip && !host && !kind) {
+    if (body) body.innerHTML = `<tr><td colspan="6" class="empty">Type a keyword, IP, or host.</td></tr>`;
+    if (meta) meta.textContent = "";
+    return;
+  }
+  try {
+    const page = await j("/api/search?" + params.toString());
+    const hits = page.hits || [];
+    if (meta) meta.textContent = hits.length + " hits · " + (page.took_ms ?? 0) + " ms";
+    if (!hits.length) {
+      body.innerHTML = `<tr><td colspan="6" class="empty">Nothing matched.</td></tr>`;
+      return;
+    }
+    body.innerHTML = hits.map(h => `<tr>
+      <td>${h.num ? "#" + h.num : h.bucket}</td>
+      <td>${h.time ? ago(h.time) : ""}</td>
+      <td>${esc(h.title || h.kind || h.category || "")}</td>
+      <td class="mono">${esc(h.src_ip || "")}${h.user ? " · " + esc(h.user) : ""}</td>
+      <td class="mono">${esc(h.path || h.url || "")}</td>
+      <td>${esc(h.source || h.host || "")}</td>
+    </tr>`).join("");
+  } catch (err) {
+    if (body) body.innerHTML = `<tr><td colspan="6" class="empty">${esc(err.message)}</td></tr>`;
+  }
+}
+
+const searchForm = $("#search-form");
+if (searchForm) searchForm.addEventListener("submit", runSearch);
 
 const settingsForm = $("#settings-form");
 if (settingsForm) settingsForm.addEventListener("submit", saveSettings);

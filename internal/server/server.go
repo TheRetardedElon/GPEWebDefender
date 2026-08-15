@@ -45,6 +45,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/reports/auth", s.reportAuth)
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
+	mux.HandleFunc("GET /api/search", s.search)
 	if s.DocsDir != "" {
 		mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/docs/", http.StatusFound)
@@ -275,6 +276,20 @@ func (s *Server) alerts(w http.ResponseWriter, r *http.Request) {
 	page, err := s.Store.Alerts(store.AlertQuery{
 		Q: q.Get("q"), Severity: q.Get("severity"), IP: q.Get("ip"), Source: q.Get("source"),
 		Since: since, Limit: limit, BeforeNum: before, AfterNum: after,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, page)
+}
+
+func (s *Server) search(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	page, err := s.Store.Search(store.SearchQuery{
+		Q: q.Get("q"), IP: q.Get("ip"), Host: q.Get("host"),
+		Source: q.Get("source"), Kind: q.Get("kind"), Limit: limit,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), 500)

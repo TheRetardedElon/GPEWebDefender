@@ -106,7 +106,12 @@ CREATE INDEX IF NOT EXISTS al_source ON alerts(source);
 	} {
 		_, _ = s.db.Exec(col) // already-exists is fine
 	}
-	return s.backfillAlertNums()
+	if err := s.backfillAlertNums(); err != nil {
+		return err
+	}
+	_, _ = s.db.Exec(`UPDATE events SET kind = 'tenantlogin' WHERE lower(IFNULL(kind,'')) IN
+		('ownerlogin','tenant','owner','siteowner','site-owner','site_owner')`)
+	return s.initSearch()
 }
 
 func (s *Store) backfillAlertNums() error {
@@ -152,7 +157,11 @@ func (s *Store) InsertEvent(ev event.Event) error {
 		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		ev.ID, ev.Time.UnixMilli(), ev.SrcIP, ev.Method, ev.URL, ev.Path, ev.Query,
 		ev.Status, ev.Bytes, ev.UA, ev.Referer, ev.Host, ev.Source, ev.Raw, ev.User, ev.Kind, ev.Outcome)
-	return err
+	if err != nil {
+		return err
+	}
+	s.indexEvent(ev)
+	return nil
 }
 
 func (s *Store) InsertAlert(al *event.Alert) error {
@@ -171,7 +180,11 @@ func (s *Store) InsertAlert(al *event.Alert) error {
 		al.ID, al.Time.UnixMilli(), al.EventID, al.RuleID, al.Title, al.Severity, al.Category,
 		al.SrcIP, al.Method, al.URL, al.Status, al.UA, al.Evidence, string(mitre), al.Count, al.Source,
 		al.Country, al.CountryName, al.Lat, al.Lon, string(tags), al.Num)
-	return err
+	if err != nil {
+		return err
+	}
+	s.indexAlert(*al)
+	return nil
 }
 
 type AlertQuery struct {
@@ -532,13 +545,13 @@ ORDER BY events_1h DESC, alerts_1h DESC, source`, hour, hour)
 
 func (s *Store) Prune(olderThan time.Duration) error {
 	cut := time.Now().Add(-olderThan).UnixMilli()
-	_, err := s.db.Exec(`DELETE FROM events WHERE ts < ?`, cut)
-	if err != nil {
+	_, _ = s.db.Exec(`DELETE FROM search_idx WHERE bucket = 'event' AND ref IN (SELECT id FROM events WHERE ts < ?)`, cut)
+	if _, err := s.db.Exec(`DELETE FROM events WHERE ts < ?`, cut); err != nil {
 		return err
 	}
-	// Keep alerts longer (4x) so the SOC view still has history.
 	alertCut := time.Now().Add(-olderThan * 4).UnixMilli()
-	_, err = s.db.Exec(`DELETE FROM alerts WHERE ts < ?`, alertCut)
+	_, _ = s.db.Exec(`DELETE FROM search_idx WHERE bucket = 'alert' AND ref IN (SELECT id FROM alerts WHERE ts < ?)`, alertCut)
+	_, err := s.db.Exec(`DELETE FROM alerts WHERE ts < ?`, alertCut)
 	return err
 }
 

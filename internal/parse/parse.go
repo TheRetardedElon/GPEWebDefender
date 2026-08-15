@@ -168,13 +168,9 @@ func parseJSON(line, source string) (event.Event, bool) {
 	kind := strings.ToLower(firstString(raw, "kind", "channel"))
 	outcome := strings.ToLower(firstString(raw, "outcome", "result"))
 	user := firstString(raw, "user", "username", "account")
-	if kind == "app" || kind == "appauth" || kind == "login" {
-		kind = event.KindAppLogin
-	}
-	if kind == "linux" || kind == "ssh" || kind == "auth" {
-		kind = event.KindHostAuth
-	}
-	if kind == event.KindAppLogin {
+	role := firstString(raw, "role", "audience", "scope", "actor")
+	kind = event.NormalizeKind(kind, role)
+	if kind == event.KindAppLogin || kind == event.KindTenantLogin {
 		if method == "" || method == "GET" && firstString(raw, "request_method") == "" {
 			method = "LOGIN"
 		}
@@ -219,7 +215,9 @@ func parseJSON(line, source string) (event.Event, bool) {
 		Raw:      line,
 		Kind:     kind,
 		Outcome:  outcome,
+		Role:     role,
 	}
+	ev.ApplyLoginDefaults()
 	return ev, true
 }
 

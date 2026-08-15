@@ -78,6 +78,19 @@ func TestParseAppLoginJSON(t *testing.T) {
 	}
 }
 
+func TestParseTenantLogin(t *testing.T) {
+	line := `{"kind":"applogin","role":"tenant","src_ip":"198.51.100.8","user":"owner@site","path":"/owner/login","status":401,"outcome":"fail"}`
+	ev, ok := Parse(line, "platform")
+	if !ok || ev.Kind != "tenantlogin" || ev.Method != "LOGIN" || ev.User != "owner@site" {
+		t.Fatalf("%+v ok=%v", ev, ok)
+	}
+	line = `{"kind":"ownerlogin","src_ip":"198.51.100.8","user":"bob","status":401}`
+	ev, ok = Parse(line, "platform")
+	if !ok || ev.Kind != "tenantlogin" {
+		t.Fatalf("alias: %+v", ev)
+	}
+}
+
 func TestSkipBlank(t *testing.T) {
 	if _, ok := Parse("  ", "x"); ok {
 		t.Fatal("blank should not parse")

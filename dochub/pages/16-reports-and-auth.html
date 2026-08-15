@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>16 · Reports &amp; auth — GPEWebDefender</title>
+  <title>16 · Reports &amp; auth — gpesiem</title>
   <link rel="stylesheet" href="../css/dochub.css" />
 </head>
 <body data-base="..">
@@ -38,11 +38,13 @@
         <table>
           <thead><tr><th>Tab</th><th>For</th></tr></thead>
           <tbody>
-            <tr><td>Live / Settings</td><td>Map, numbered feed. Settings is pins + retention, not sensors. See <a href="17-configure.html">17</a>.</td></tr>
+            <tr><td>Live</td><td>Map, SSE feed, severity search. Same as v0.2.</td></tr>
             <tr><td>Reports → Attack vectors</td><td>Category / rule / path / country / hourly mix from alerts.</td></tr>
             <tr><td>Reports → Auth · Web</td><td>401/403 and login-path hits from access logs.</td></tr>
             <tr><td>Reports → Auth · Linux</td><td>Parsed <code>auth.log</code> / <code>secure</code> (sshd, sudo, PAM, console login).</td></tr>
             <tr><td>Reports → Auth · App</td><td>Structured <code>kind=applogin</code> events your application ships.</td></tr>
+            <tr><td>Reports → Auth · Tenants</td><td>Site-owner / tenant logins: <code>kind=tenantlogin</code> or <code>kind=applogin</code> + <code>role=tenant</code>. Own map color.</td></tr>
+            <tr><td>Search</td><td>Keyword + IP + host. SQLite FTS5 on the manager — no Elastic.</td></tr>
           </tbody>
         </table>
         <p class="hint">
@@ -69,7 +71,7 @@
           Same agent, extra tail. We keep sshd failures / accepts, invalid users,
           sudo auth failures, and a few PAM / console lines. Cron and kernel stay on the floor.
         </p>
-        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpewebdefender agent \
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpesiem agent \
   --url http://MONITOR:8787 \
   --token SECRET \
   --name web-1 \
@@ -81,7 +83,7 @@
 # Debian 13+ is often journald-only — use --journal.
 
 # Linux-only box (no HTTP):
-gpewebdefender agent --url http://MONITOR:8787 --token SECRET --name db-1 --journal</code></pre>
+gpesiem agent --url http://MONITOR:8787 --token SECRET --name db-1 --journal</code></pre>
         <div class="callout info">
           <strong>Still not OSSEC</strong>
           This is an auth parser, not FIM, not rootkit, not every facility. If the line is not a login, we drop it.
@@ -129,6 +131,21 @@ X-SIEM-Source: app-api
         </p>
       </section>
 
+      <section class="block" id="tenant">
+        <h2>Tenant / site-owner logins</h2>
+        <p>
+          Same ingest as app logins, but tagged so they get their own report tab and map color.
+          Use this for the people who <em>own a site</em>, not staff SSH and not generic <code>/api/login</code>.
+        </p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>{ "kind": "tenantlogin", "src_ip": "203.0.113.9", "user": "owner@site",
+  "path": "/owner/login", "status": 401, "outcome": "fail", "method": "LOGIN" }
+
+# or keep kind=applogin and set role:
+{ "kind": "applogin", "role": "tenant", "src_ip": "203.0.113.9", "user": "owner@site",
+  "status": 401, "outcome": "fail" }</code></pre>
+        <p class="hint">Aliases for <code>kind</code>: <code>ownerlogin</code>, <code>tenant</code>, <code>owner</code>. Never send the password.</p>
+      </section>
+
       <section class="block" id="api">
         <h2>Report endpoints</h2>
         <table>
@@ -140,7 +157,7 @@ X-SIEM-Source: app-api
         </table>
       </section>
 
-      <footer class="foot">GPEWebDefender DocHub · 16 · back to <a href="../index.html">hub home</a></footer>
+      <footer class="foot">gpesiem DocHub · 16 · back to <a href="../index.html">hub home</a></footer>
     </main>
   </div>
   <script src="../js/nav.js"></script>

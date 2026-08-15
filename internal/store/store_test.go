@@ -111,3 +111,27 @@ func TestSettingsAndAlertNums(t *testing.T) {
 		t.Fatalf("settings: %+v %v", got, err)
 	}
 }
+
+func TestSearchFTS(t *testing.T) {
+	dir := t.TempDir()
+	st, err := Open(filepath.Join(dir, "s2.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	now := time.Now().UTC()
+	must := func(e error) {
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	must(st.InsertEvent(event.Event{ID: "e1", Time: now, SrcIP: "203.0.113.9", User: "alice", Path: "/owner/login", Kind: "tenantlogin", Source: "platform", URL: "/owner/login"}))
+	page, err := st.Search(SearchQuery{Q: "alice", Limit: 10})
+	if err != nil || len(page.Hits) != 1 || page.Hits[0].User != "alice" {
+		t.Fatalf("fts user: %+v %v", page, err)
+	}
+	page, err = st.Search(SearchQuery{IP: "203.0.113.9", Limit: 10})
+	if err != nil || len(page.Hits) != 1 {
+		t.Fatalf("ip: %+v %v", page, err)
+	}
+}

@@ -1,6 +1,9 @@
 package event
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Event is one normalized HTTP (or HTTP-like) log line.
 type Event struct {
@@ -21,17 +24,60 @@ type Event struct {
 	Protocol  string    `json:"protocol,omitempty"`
 	Source    string    `json:"source"`
 	Raw       string    `json:"raw,omitempty"`
-	Kind      string    `json:"kind,omitempty"`     // web | hostauth | applogin
+	Kind      string    `json:"kind,omitempty"`     // web | hostauth | applogin | tenantlogin
 	Outcome   string    `json:"outcome,omitempty"`  // fail | ok
+	Role      string    `json:"role,omitempty"`     // tenant | owner | … (upgrades applogin)
 }
 
 const (
-	KindWeb      = "web"
-	KindHostAuth = "hostauth"
-	KindAppLogin = "applogin"
-	OutcomeFail  = "fail"
-	OutcomeOK    = "ok"
+	KindWeb         = "web"
+	KindHostAuth    = "hostauth"
+	KindAppLogin    = "applogin"
+	KindTenantLogin = "tenantlogin"
+	OutcomeFail     = "fail"
+	OutcomeOK       = "ok"
 )
+
+// NormalizeKind maps shipper aliases onto the four kinds we store.
+func NormalizeKind(kind, role string) string {
+	k := strings.ToLower(strings.TrimSpace(kind))
+	r := strings.ToLower(strings.TrimSpace(role))
+	switch k {
+	case KindTenantLogin, "ownerlogin", "tenant", "owner", "siteowner", "site-owner", "site_owner":
+		return KindTenantLogin
+	case KindAppLogin, "app", "appauth", "login":
+		k = KindAppLogin
+	case KindHostAuth, "linux", "ssh", "auth":
+		return KindHostAuth
+	case KindWeb, "":
+		k = KindWeb
+	}
+	switch r {
+	case "tenant", "owner", "site-owner", "siteowner", "site_owner":
+		return KindTenantLogin
+	}
+	return k
+}
+
+func (ev *Event) ApplyLoginDefaults() {
+	if ev.Kind != KindAppLogin && ev.Kind != KindTenantLogin {
+		return
+	}
+	if ev.Method == "" || ev.Method == "GET" {
+		ev.Method = "LOGIN"
+	}
+	if ev.Outcome == "" {
+		switch ev.Status {
+		case 401, 403:
+			ev.Outcome = OutcomeFail
+		case 200, 201, 204, 302:
+			ev.Outcome = OutcomeOK
+		}
+	}
+	if ev.Path == "" {
+		ev.Path = "/login"
+	}
+}
 
 // Alert is a detection fired against an event (or a threshold window).
 type Alert struct {
@@ -128,6 +174,30 @@ type Settings struct {
 }
 
 // AlertPage is a lazy-loaded slice of the feed.
+// SearchHit is one row from the FTS5 index (events + alerts).
+type SearchHit struct {
+	Bucket   string    `json:"bucket"`
+	Ref      string    `json:"ref"`
+	Num      int64     `json:"num,omitempty"`
+	Time     time.Time `json:"time"`
+	SrcIP    string    `json:"src_ip,omitempty"`
+	User     string    `json:"user,omitempty"`
+	Host     string    `json:"host,omitempty"`
+	Source   string    `json:"source,omitempty"`
+	Path     string    `json:"path,omitempty"`
+	URL      string    `json:"url,omitempty"`
+	Title    string    `json:"title,omitempty"`
+	Kind     string    `json:"kind,omitempty"`
+	Category string    `json:"category,omitempty"`
+	Severity string    `json:"severity,omitempty"`
+}
+
+type SearchPage struct {
+	Hits    []SearchHit `json:"hits"`
+	HasMore bool        `json:"has_more"`
+	TookMS  int64       `json:"took_ms"`
+}
+
 type AlertPage struct {
 	Alerts   []Alert `json:"alerts"`
 	HasMore  bool    `json:"has_more"`

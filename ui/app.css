@@ -52,7 +52,21 @@ button, input { font: inherit; color: inherit; }
   color: var(--muted); padding: 10px 16px; cursor: pointer; letter-spacing: 0.04em;
 }
 .tabs button.on { color: var(--ink); border-bottom-color: var(--copper); }
-#view-reports[hidden], #view-live[hidden], #view-settings[hidden] { display: none !important; }
+#view-reports[hidden], #view-live[hidden], #view-settings[hidden], #view-search[hidden] { display: none !important; }
+.search-bar {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 14px 22px 8px;
+}
+.search-bar input, .search-bar select {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; color: var(--ink);
+}
+.search-bar input[type="search"] { min-width: 180px; flex: 1; }
+.search-bar button {
+  background: var(--bg-3); border: 1px solid var(--copper); border-radius: 8px;
+  padding: 7px 14px; cursor: pointer; color: var(--ink);
+}
+.search-wrap { padding: 8px 22px 28px; }
 .settings {
   max-width: 760px; padding: 16px 22px 40px;
   display: flex; flex-direction: column; gap: 18px;

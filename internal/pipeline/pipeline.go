@@ -36,9 +36,11 @@ func (p *Pipeline) IngestLine(line, source string) {
 	if ev.ID == "" {
 		ev.ID = store.ID()
 	}
+	ev.Kind = event.NormalizeKind(ev.Kind, ev.Role)
 	if ev.Kind == "" {
 		ev.Kind = event.KindWeb
 	}
+	ev.ApplyLoginDefaults()
 	p.Seen.Add(1)
 	if err := p.Store.InsertEvent(ev); err != nil {
 		log.Printf("store event: %v", err)
@@ -76,21 +78,11 @@ func (p *Pipeline) IngestEvent(ev event.Event) {
 	if ev.Time.IsZero() {
 		ev.Time = time.Now().UTC()
 	}
+	ev.Kind = event.NormalizeKind(ev.Kind, ev.Role)
 	if ev.Kind == "" {
 		ev.Kind = event.KindWeb
 	}
-	if ev.Kind == event.KindAppLogin {
-		if ev.Method == "" {
-			ev.Method = "LOGIN"
-		}
-		if ev.Outcome == "" {
-			if ev.Status == 401 || ev.Status == 403 {
-				ev.Outcome = event.OutcomeFail
-			} else if ev.Status >= 200 && ev.Status < 400 {
-				ev.Outcome = event.OutcomeOK
-			}
-		}
-	}
+	ev.ApplyLoginDefaults()
 	p.Seen.Add(1)
 	_ = p.Store.InsertEvent(ev)
 	for _, al := range p.Engine.Evaluate(ev) {

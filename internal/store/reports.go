@@ -254,6 +254,8 @@ func authSQL(channel string) (kindFilter, failSQL string) {
 		return "kind = 'hostauth'", "(outcome = 'fail' OR status IN (401,403))"
 	case "app", "applogin", "platform":
 		return "kind = 'applogin'", "(outcome = 'fail' OR status IN (401,403))"
+	case "tenant", "tenantlogin", "owner", "ownerlogin":
+		return "kind = 'tenantlogin'", "(outcome = 'fail' OR status IN (401,403))"
 	default:
 		// Web: 401/403 or obvious login paths. Empty kind is legacy access-log rows.
 		return "(IFNULL(kind,'') IN ('','web'))",
