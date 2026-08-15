@@ -50,7 +50,7 @@ func (p *Pipeline) IngestLine(line, source string) {
 		}
 		p.enrich(&al)
 		p.Fired.Add(1)
-		if err := p.Store.InsertAlert(al); err != nil {
+		if err := p.Store.InsertAlert(&al); err != nil {
 			log.Printf("store alert: %v", err)
 			continue
 		}
@@ -97,7 +97,7 @@ func (p *Pipeline) IngestEvent(ev event.Event) {
 		al.ID = store.ID()
 		p.enrich(&al)
 		p.Fired.Add(1)
-		_ = p.Store.InsertAlert(al)
+		_ = p.Store.InsertAlert(&al)
 		if p.Hub != nil {
 			p.Hub.Publish(al)
 		}

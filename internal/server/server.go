@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"gpewebdefender/internal/event"
+	"gpewebdefender/internal/geo"
 	"gpewebdefender/internal/hub"
 	"gpewebdefender/internal/pipeline"
 	"gpewebdefender/internal/store"
@@ -41,6 +42,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/sources", s.sources)
 	mux.HandleFunc("GET /api/reports/vectors", s.reportVectors)
 	mux.HandleFunc("GET /api/reports/auth", s.reportAuth)
+	mux.HandleFunc("GET /api/settings", s.getSettings)
+	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	if s.DocsDir != "" {
 		mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/docs/", http.StatusFound)
@@ -266,12 +269,78 @@ func (s *Server) alerts(w http.ResponseWriter, r *http.Request) {
 			since = time.Now().Add(-d)
 		}
 	}
-	al, err := s.Store.Alerts(q.Get("q"), q.Get("severity"), q.Get("ip"), q.Get("source"), since, limit)
+	before, _ := strconv.ParseInt(q.Get("before"), 10, 64)
+	after, _ := strconv.ParseInt(q.Get("after"), 10, 64)
+	page, err := s.Store.Alerts(store.AlertQuery{
+		Q: q.Get("q"), Severity: q.Get("severity"), IP: q.Get("ip"), Source: q.Get("source"),
+		Since: since, Limit: limit, BeforeNum: before, AfterNum: after,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	writeJSON(w, al)
+	writeJSON(w, page)
+}
+
+func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
+	st, err := s.Store.Settings()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"settings":  st,
+		"token_set": s.Token != "",
+		"geoip":     s.Pipe.Geo != nil && s.Pipe.Geo.HasMMDB(),
+		"rules":     s.Pipe.Engine.Len(),
+	})
+}
+
+func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
+	var in event.Settings
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		http.Error(w, "bad json", 400)
+		return
+	}
+	in.Home = strings.TrimSpace(in.Home)
+	in.Homes = strings.TrimSpace(in.Homes)
+	in.SiteName = strings.TrimSpace(in.SiteName)
+	in.Retain = strings.TrimSpace(in.Retain)
+	in.Timezone = strings.TrimSpace(in.Timezone)
+	if in.Home != "" {
+		if _, err := geo.ParseHome(in.Home); err != nil {
+			http.Error(w, "home: "+err.Error(), 400)
+			return
+		}
+	}
+	if in.Homes != "" {
+		if _, err := geo.ParseHomes(in.Homes); err != nil {
+			http.Error(w, "homes: "+err.Error(), 400)
+			return
+		}
+	}
+	if in.Retain != "" {
+		d, err := time.ParseDuration(in.Retain)
+		if err != nil || d < time.Hour {
+			http.Error(w, "retain: use a Go duration of at least 1h (e.g. 168h)", 400)
+			return
+		}
+	}
+	if in.Timezone != "" && in.Timezone != "UTC" && in.Timezone != "local" {
+		http.Error(w, "timezone: UTC or local", 400)
+		return
+	}
+	if err := s.Store.PutSettings(in); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	if s.Pipe.Geo != nil {
+		if in.Home != "" {
+			_ = s.Pipe.Geo.SetHome(in.Home)
+		}
+		_ = s.Pipe.Geo.SetHomes(in.Homes)
+	}
+	writeJSON(w, map[string]any{"ok": true, "settings": in})
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {

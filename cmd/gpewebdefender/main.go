@@ -27,7 +27,7 @@ import (
 	"gpewebdefender/rules"
 )
 
-const version = "0.3.0"
+const version = "0.4.0"
 
 func main() {
 	log.SetFlags(0)
@@ -94,8 +94,9 @@ func serveCmd(args []string) {
 		log.Fatal(err)
 	}
 	defer pipe.Store.Close()
+	seedAndApplySettings(pipe, *home, *homes, *retain)
 
-	go pruneLoop(ctx, pipe.Store, *retain)
+	go pruneLoop(ctx, pipe.Store)
 
 	for _, p := range splitCSV(*tailPath) {
 		p := p
@@ -351,11 +352,37 @@ func loadBuiltin(eng *detect.Engine) error {
 	return eng.SetRules(rs)
 }
 
-func pruneLoop(ctx context.Context, st *store.Store, retain time.Duration) {
+func seedAndApplySettings(pipe *pipeline.Pipeline, home, homes string, retain time.Duration) {
+	cur, err := pipe.Store.Settings()
+	if err != nil {
+		log.Printf("settings: %v", err)
+		return
+	}
+	if cur.Home == "" {
+		cur.Home = home
+	}
+	if cur.Homes == "" {
+		cur.Homes = homes
+	}
+	if cur.Retain == "" {
+		cur.Retain = retain.String()
+	}
+	if err := pipe.Store.PutSettings(cur); err != nil {
+		log.Printf("settings save: %v", err)
+	}
+	if pipe.Geo != nil {
+		if cur.Home != "" {
+			_ = pipe.Geo.SetHome(cur.Home)
+		}
+		_ = pipe.Geo.SetHomes(cur.Homes)
+	}
+}
+
+func pruneLoop(ctx context.Context, st *store.Store) {
 	t := time.NewTicker(30 * time.Minute)
 	defer t.Stop()
 	for {
-		if err := st.Prune(retain); err != nil {
+		if err := st.Prune(st.Retain()); err != nil {
 			log.Printf("prune: %v", err)
 		}
 		select {

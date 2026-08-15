@@ -31,6 +31,7 @@
   <nav class="tabs" id="view-tabs" aria-label="Views">
     <button type="button" data-view="live" class="on">Live</button>
     <button type="button" data-view="reports">Reports</button>
+    <button type="button" data-view="settings">Settings</button>
   </nav>
 
   <div id="view-live">
@@ -102,6 +103,40 @@
     </div>
     <section class="stats" id="report-stats"></section>
     <div class="report-grid" id="report-body"></div>
+  </div>
+
+  <div id="view-settings" hidden>
+    <form class="settings" id="settings-form">
+      <p class="hint-box">These save on this manager (SQLite). Bind address and ingest token stay in the process flags / env file — they are not edited here.</p>
+      <div class="field">
+        <label for="set-name">Display name</label>
+        <input id="set-name" name="site_name" maxlength="80" placeholder="GPEWebDefender" />
+      </div>
+      <div class="field">
+        <label for="set-home">Default map home</label>
+        <input id="set-home" name="home" placeholder="US or 40.7,-74.0" />
+      </div>
+      <div class="field">
+        <label for="set-homes">Named homes (one pin per agent --name)</label>
+        <textarea id="set-homes" name="homes" rows="3" placeholder="web-1=40.7,-74.0;edge-eu=DE"></textarea>
+      </div>
+      <div class="field">
+        <label for="set-retain">Keep raw events</label>
+        <input id="set-retain" name="retain" placeholder="168h" />
+      </div>
+      <div class="field">
+        <label for="set-tz">Timestamps</label>
+        <select id="set-tz" name="timezone">
+          <option value="UTC">UTC</option>
+          <option value="local">Browser local</option>
+        </select>
+      </div>
+      <div class="settings-meta muted" id="settings-meta"></div>
+      <div class="settings-actions">
+        <button type="submit">Save</button>
+        <span class="muted" id="settings-status"></span>
+      </div>
+    </form>
   </div>
 
   <dialog id="detail">

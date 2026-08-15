@@ -52,7 +52,26 @@ button, input { font: inherit; color: inherit; }
   color: var(--muted); padding: 10px 16px; cursor: pointer; letter-spacing: 0.04em;
 }
 .tabs button.on { color: var(--ink); border-bottom-color: var(--copper); }
-#view-reports[hidden], #view-live[hidden] { display: none !important; }
+#view-reports[hidden], #view-live[hidden], #view-settings[hidden] { display: none !important; }
+.settings {
+  max-width: 720px; padding: 16px 22px 32px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.field label {
+  display: block; color: var(--muted); font-size: 11px;
+  letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+}
+.field input, .field textarea, .field select {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; color: var(--ink);
+}
+.field textarea { font-family: ui-monospace, Consolas, monospace; resize: vertical; }
+.settings-actions { display: flex; align-items: center; gap: 12px; }
+.settings-actions button {
+  background: var(--bg-3); border: 1px solid var(--copper); border-radius: 8px;
+  padding: 7px 14px; cursor: pointer; color: var(--ink);
+}
+.anum { color: var(--copper); font-variant-numeric: tabular-nums; font-weight: 650; font-size: 12px; padding-top: 2px; }
 .report-bar {
   display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   padding: 12px 22px 4px; align-items: center;
@@ -168,7 +187,7 @@ button, input { font: inherit; color: inherit; }
 .list.compact { max-height: 280px; }
 
 .row {
-  display: grid; grid-template-columns: 72px 1fr auto; gap: 10px;
+  display: grid; grid-template-columns: 56px 72px 1fr auto; gap: 10px;
   padding: 10px 14px; border-bottom: 1px solid #2c282055;
   cursor: pointer;
 }

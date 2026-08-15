@@ -35,6 +35,7 @@ const (
 
 // Alert is a detection fired against an event (or a threshold window).
 type Alert struct {
+	Num       int64     `json:"num,omitempty"`
 	ID        string    `json:"id"`
 	Time      time.Time `json:"time"`
 	EventID   string    `json:"event_id"`
@@ -117,6 +118,23 @@ type MapArc struct {
 }
 
 // SourceInfo is one shipper / local tail name for the host picker.
+// Settings is operator config stored in SQLite (overrides flags after first save).
+type Settings struct {
+	SiteName string `json:"site_name"`
+	Home     string `json:"home"`
+	Homes    string `json:"homes"`
+	Retain   string `json:"retain"`
+	Timezone string `json:"timezone"`
+}
+
+// AlertPage is a lazy-loaded slice of the feed.
+type AlertPage struct {
+	Alerts   []Alert `json:"alerts"`
+	HasMore  bool    `json:"has_more"`
+	OldestNum int64  `json:"oldest_num,omitempty"`
+	NewestNum int64  `json:"newest_num,omitempty"`
+}
+
 type SourceInfo struct {
 	Name        string    `json:"name"`
 	Events1h    int64     `json:"events_1h"`

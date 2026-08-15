@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -99,10 +100,50 @@ CREATE INDEX IF NOT EXISTS al_source ON alerts(source);
 		"CREATE INDEX IF NOT EXISTS ev_status ON events(status)",
 		"CREATE INDEX IF NOT EXISTS ev_user ON events(user)",
 		"CREATE INDEX IF NOT EXISTS al_cat ON alerts(category)",
+		"ALTER TABLE alerts ADD COLUMN num INTEGER",
+		"CREATE UNIQUE INDEX IF NOT EXISTS al_num ON alerts(num)",
+		`CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
 	} {
 		_, _ = s.db.Exec(col) // already-exists is fine
 	}
-	return nil
+	return s.backfillAlertNums()
+}
+
+func (s *Store) backfillAlertNums() error {
+	_, err := s.db.Exec(`
+UPDATE alerts SET num = (
+  SELECT COUNT(*) FROM alerts a2
+  WHERE a2.ts < alerts.ts OR (a2.ts = alerts.ts AND a2.id <= alerts.id)
+) WHERE IFNULL(num,0) = 0`)
+	if err != nil {
+		return err
+	}
+	var max sql.NullInt64
+	if err := s.db.QueryRow(`SELECT MAX(num) FROM alerts`).Scan(&max); err != nil {
+		return err
+	}
+	n := int64(0)
+	if max.Valid {
+		n = max.Int64
+	}
+	_, err = s.db.Exec(`INSERT INTO settings(k,v) VALUES('alert_num', ?)
+		ON CONFLICT(k) DO UPDATE SET v = CASE WHEN CAST(v AS INTEGER) < ? THEN ? ELSE v END`,
+		fmt.Sprintf("%d", n), n, fmt.Sprintf("%d", n))
+	return err
+}
+
+func (s *Store) nextAlertNum() (int64, error) {
+	if _, err := s.db.Exec(`INSERT INTO settings(k,v) VALUES('alert_num','0') ON CONFLICT(k) DO NOTHING`); err != nil {
+		return 0, err
+	}
+	if _, err := s.db.Exec(`UPDATE settings SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) WHERE k = 'alert_num'`); err != nil {
+		return 0, err
+	}
+	var raw string
+	if err := s.db.QueryRow(`SELECT v FROM settings WHERE k = 'alert_num'`).Scan(&raw); err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(raw, 10, 64)
 }
 
 func (s *Store) InsertEvent(ev event.Event) error {
@@ -114,55 +155,90 @@ func (s *Store) InsertEvent(ev event.Event) error {
 	return err
 }
 
-func (s *Store) InsertAlert(al event.Alert) error {
+func (s *Store) InsertAlert(al *event.Alert) error {
+	if al.Num <= 0 {
+		n, err := s.nextAlertNum()
+		if err != nil {
+			return err
+		}
+		al.Num = n
+	}
 	mitre, _ := json.Marshal(al.MITRE)
 	tags, _ := json.Marshal(al.Tags)
 	_, err := s.db.Exec(`INSERT OR REPLACE INTO alerts
-		(id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source, country, country_name, lat, lon, tags)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		(id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source, country, country_name, lat, lon, tags, num)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		al.ID, al.Time.UnixMilli(), al.EventID, al.RuleID, al.Title, al.Severity, al.Category,
 		al.SrcIP, al.Method, al.URL, al.Status, al.UA, al.Evidence, string(mitre), al.Count, al.Source,
-		al.Country, al.CountryName, al.Lat, al.Lon, string(tags))
+		al.Country, al.CountryName, al.Lat, al.Lon, string(tags), al.Num)
 	return err
 }
 
-func (s *Store) Alerts(q, severity, ip, source string, since time.Time, limit int) ([]event.Alert, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 100
+type AlertQuery struct {
+	Q, Severity, IP, Source string
+	Since                   time.Time
+	Limit                   int
+	BeforeNum               int64
+	AfterNum                int64
+}
+
+func (s *Store) Alerts(q AlertQuery) (event.AlertPage, error) {
+	if q.Limit <= 0 || q.Limit > 200 {
+		q.Limit = 40
 	}
 	var cond []string
 	var args []any
-	if !since.IsZero() {
+	if !q.Since.IsZero() {
 		cond = append(cond, "ts >= ?")
-		args = append(args, since.UnixMilli())
+		args = append(args, q.Since.UnixMilli())
 	}
-	if severity != "" && severity != "all" {
+	if q.Severity != "" && q.Severity != "all" {
 		cond = append(cond, "severity = ?")
-		args = append(args, severity)
+		args = append(args, q.Severity)
 	}
-	if ip != "" {
+	if q.IP != "" {
 		cond = append(cond, "src_ip = ?")
-		args = append(args, ip)
+		args = append(args, q.IP)
 	}
-	if source != "" {
+	if q.Source != "" {
 		cond = append(cond, "source = ?")
-		args = append(args, source)
+		args = append(args, q.Source)
 	}
-	if q != "" {
-		cond = append(cond, "(title LIKE ? OR url LIKE ? OR src_ip LIKE ? OR rule_id LIKE ? OR evidence LIKE ? OR source LIKE ?)")
-		like := "%" + q + "%"
-		args = append(args, like, like, like, like, like, like)
+	if q.BeforeNum > 0 {
+		cond = append(cond, "num < ?")
+		args = append(args, q.BeforeNum)
+	}
+	if q.AfterNum > 0 {
+		cond = append(cond, "num > ?")
+		args = append(args, q.AfterNum)
+	}
+	if q.Q != "" {
+		qtrim := strings.TrimSpace(q.Q)
+		raw := strings.TrimPrefix(qtrim, "#")
+		if n, err := strconv.ParseInt(raw, 10, 64); err == nil && (qtrim == raw || strings.HasPrefix(qtrim, "#")) {
+			cond = append(cond, "num = ?")
+			args = append(args, n)
+		} else {
+			cond = append(cond, "(title LIKE ? OR url LIKE ? OR src_ip LIKE ? OR rule_id LIKE ? OR evidence LIKE ? OR source LIKE ? OR CAST(num AS TEXT) = ?)")
+			like := "%" + q.Q + "%"
+			args = append(args, like, like, like, like, like, like, q.Q)
+		}
 	}
 	where := ""
 	if len(cond) > 0 {
 		where = "WHERE " + strings.Join(cond, " AND ")
 	}
-	args = append(args, limit)
+	fetch := q.Limit + 1
+	args = append(args, fetch)
+	order := "ORDER BY num DESC"
+	if q.AfterNum > 0 {
+		order = "ORDER BY num ASC"
+	}
 	rows, err := s.db.Query(`SELECT id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source,
-		COALESCE(country,''), COALESCE(country_name,''), COALESCE(lat,0), COALESCE(lon,0), COALESCE(tags,'')
-		FROM alerts `+where+` ORDER BY ts DESC LIMIT ?`, args...)
+		COALESCE(country,''), COALESCE(country_name,''), COALESCE(lat,0), COALESCE(lon,0), COALESCE(tags,''), COALESCE(num,0)
+		FROM alerts `+where+` `+order+` LIMIT ?`, args...)
 	if err != nil {
-		return nil, err
+		return event.AlertPage{}, err
 	}
 	defer rows.Close()
 	var out []event.Alert
@@ -172,8 +248,8 @@ func (s *Store) Alerts(q, severity, ip, source string, since time.Time, limit in
 		var mitre, tags string
 		if err := rows.Scan(&a.ID, &ts, &a.EventID, &a.RuleID, &a.Title, &a.Severity, &a.Category,
 			&a.SrcIP, &a.Method, &a.URL, &a.Status, &a.UA, &a.Evidence, &mitre, &a.Count, &a.Source,
-			&a.Country, &a.CountryName, &a.Lat, &a.Lon, &tags); err != nil {
-			return nil, err
+			&a.Country, &a.CountryName, &a.Lat, &a.Lon, &tags, &a.Num); err != nil {
+			return event.AlertPage{}, err
 		}
 		a.Time = time.UnixMilli(ts).UTC()
 		a.HasGeo = a.Country != "" && (a.Lat != 0 || a.Lon != 0)
@@ -184,7 +260,21 @@ func (s *Store) Alerts(q, severity, ip, source string, since time.Time, limit in
 	if out == nil {
 		out = []event.Alert{}
 	}
-	return out, rows.Err()
+	hasMore := len(out) > q.Limit
+	if hasMore {
+		out = out[:q.Limit]
+	}
+	if q.AfterNum > 0 {
+		for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+			out[i], out[j] = out[j], out[i]
+		}
+	}
+	page := event.AlertPage{Alerts: out, HasMore: hasMore}
+	if len(out) > 0 {
+		page.NewestNum = out[0].Num
+		page.OldestNum = out[len(out)-1].Num
+	}
+	return page, rows.Err()
 }
 
 func (s *Store) Events(q, ip, source string, limit int) ([]event.Event, error) {

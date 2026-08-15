@@ -106,7 +106,7 @@ const HOME_PALETTE = ["#d4a054", "#5b9fd4", "#6b9e7a", "#c47ad4", "#e07a2f", "#3
 
 let lastAlerts = [];
 let selectedSource = "";
-try { selectedSource = localStorage.getItem("gwd.source") || ""; } catch (_) {}
+try { selectedSource = localStorage.getItem("gpesiem.source") || ""; } catch (_) {}
 let sourceList = [];
 
 function project(lat, lon, w, h) {
@@ -365,7 +365,7 @@ function toggleCat(cat) {
     map.filter.add(cat);
   }
   renderMapMeta();
-  renderAlerts(lastAlerts);
+  renderAlerts();
 }
 
 function renderStats(st) {
@@ -404,30 +404,88 @@ function renderStats(st) {
   }
 }
 
-function renderAlerts(list) {
+let alertBuf = [];
+let alertHasMore = false;
+let alertLoading = false;
+
+function mergeAlerts(incoming, mode) {
+  const byId = new Map(alertBuf.map(a => [a.id, a]));
+  for (const a of incoming) byId.set(a.id, a);
+  alertBuf = [...byId.values()].sort((a, b) => (b.num || 0) - (a.num || 0));
+  if (mode === "reset") {
+    // keep only this page plus we already replaced via byId from incoming-only
+    const ids = new Set(incoming.map(a => a.id));
+    if (incoming.length) alertBuf = alertBuf.filter(a => ids.has(a.id));
+    else alertBuf = [];
+  }
+}
+
+function renderAlerts() {
   const box = $("#alerts");
+  const list = alertBuf;
   const shown = list.filter(a => catShown(a.category));
   if (!shown.length) {
     box.innerHTML = `<div class="empty">${list.length ? "Nothing in this map filter…" : "Quiet. Waiting on web traffic…"}</div>`;
     $("#feed-meta").textContent = "0 shown";
     return;
   }
+  const more = alertHasMore ? `<div class="empty" id="alert-more">Scroll for older…</div>` : "";
   box.innerHTML = shown.map(a => `
     <div class="row" data-id="${esc(a.id)}">
+      <div class="anum">${a.num ? "#" + a.num : ""}</div>
       <div class="sev ${esc(a.severity)}">${esc(a.severity)}</div>
       <div>
         <div class="title"><span class="swatch" style="--sw:${catColor(a.category)}"></span>${esc(a.title)}${(a.tags || []).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
         <div class="meta">${esc(a.src_ip)}${a.country ? " · " + esc(a.country_name || a.country) : ""}${a.source ? " · " + esc(a.source) : ""} · ${esc(a.method)} ${esc(a.url)}</div>
       </div>
       <div class="when">${ago(a.time)}</div>
-    </div>`).join("");
+    </div>`).join("") + more;
   box.querySelectorAll(".row").forEach(el => {
     el.addEventListener("click", () => {
       const a = shown.find(x => x.id === el.dataset.id);
       if (a) openDetail(a);
     });
   });
-  $("#feed-meta").textContent = shown.length + (shown.length !== list.length ? ` / ${list.length}` : "") + " shown";
+  $("#feed-meta").textContent = shown.length + (alertHasMore ? "+" : "") + " shown";
+}
+
+async function fetchAlertPage(extra) {
+  const params = new URLSearchParams({ limit: "40" });
+  if (severity !== "all") params.set("severity", severity);
+  if (query) params.set("q", query);
+  Object.entries(extra || {}).forEach(([k, v]) => { if (v != null && v !== "") params.set(k, v); });
+  return j("/api/alerts" + hostQS(params));
+}
+
+async function loadAlerts(mode) {
+  if (alertLoading) return;
+  alertLoading = true;
+  try {
+    const extra = {};
+    if (mode === "older") {
+      const oldest = alertBuf.length ? Math.min(...alertBuf.map(a => a.num || 0).filter(Boolean)) : 0;
+      if (!oldest) { alertLoading = false; return; }
+      extra.before = String(oldest);
+    } else if (mode === "newer") {
+      const newest = alertBuf.length ? Math.max(...alertBuf.map(a => a.num || 0)) : 0;
+      if (newest) extra.after = String(newest);
+    }
+    const page = await fetchAlertPage(extra);
+    const incoming = page.alerts || (Array.isArray(page) ? page : []);
+    if (mode === "reset") {
+      alertBuf = incoming.slice();
+      alertHasMore = !!page.has_more;
+    } else if (mode === "older") {
+      mergeAlerts(incoming, "older");
+      alertHasMore = !!page.has_more;
+    } else {
+      mergeAlerts(incoming, "newer");
+    }
+    lastAlerts = alertBuf;
+    renderAlerts();
+  } finally {
+    alertLoading = false;
+  }
 }
 
 function renderAttackers(list) {
@@ -458,6 +516,7 @@ function openDetail(a) {
   d.querySelector("article").innerHTML = `
     <h3>${esc(a.title)}</h3>
     <dl>
+      <dt>Number</dt><dd>${a.num ? "#" + a.num : "—"}</dd>
       <dt>Severity</dt><dd>${esc(a.severity)} · ${esc(a.category)}</dd>
       <dt>Tags</dt><dd>${esc((a.tags || []).join(", ") || "—")}</dd>
       <dt>When</dt><dd>${esc(a.time)}</dd>
@@ -501,17 +560,12 @@ function fillHostSelect() {
 }
 
 async function refresh() {
-  const params = new URLSearchParams({ limit: "80" });
-  if (severity !== "all") params.set("severity", severity);
-  if (query) params.set("q", query);
-  const [st, alerts, attackers, feed, srcs] = await Promise.all([
+  const [st, attackers, feed, srcs] = await Promise.all([
     j("/api/stats" + hostQS()),
-    j("/api/alerts" + hostQS(params)),
     j("/api/attackers" + hostQS({ since: "24h" })),
     j("/api/map" + hostQS({ since: "24h", limit: "160" })),
     j("/api/sources"),
   ]);
-  alerts.forEach(a => seen.add(a.id));
   if (feed.home && feed.home.lat != null) {
     map.home = { lat: feed.home.lat, lon: feed.home.lon, name: feed.home.name || feed.home.country || "home" };
   }
@@ -521,12 +575,12 @@ async function refresh() {
   map.countries = feed.countries || [];
   sourceList = (srcs && srcs.sources) || [];
   fillHostSelect();
-  lastAlerts = alerts;
   renderStats(st);
-  renderAlerts(alerts);
   renderAttackers(attackers);
   renderMapMeta();
+  await loadAlerts(alertBuf.length ? "newer" : "reset");
   if (currentView === "reports") refreshReports().catch(() => {});
+  if (currentView === "settings") loadSettings().catch(() => {});
 }
 
 function connect() {
@@ -547,6 +601,11 @@ function connect() {
       if (seen.has(a.id)) return;
       seen.add(a.id);
       if ((a.has_geo || a.country) && sourceShown(a.source)) pushFly(a);
+      if (a.id) {
+        mergeAlerts([a], "newer");
+        lastAlerts = alertBuf;
+        renderAlerts();
+      }
       refresh().catch(() => {});
     } catch (_) {}
   });
@@ -557,6 +616,8 @@ $("#filters").addEventListener("click", (e) => {
   if (!b) return;
   severity = b.dataset.sev;
   $("#filters").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  alertBuf = [];
+  loadAlerts("reset").catch(console.error);
   refresh().catch(console.error);
 });
 
@@ -565,7 +626,8 @@ $("#q").addEventListener("input", (e) => {
   clearTimeout(t);
   t = setTimeout(() => {
     query = e.target.value.trim();
-    refresh().catch(console.error);
+    alertBuf = [];
+    loadAlerts("reset").catch(console.error);
   }, 200);
 });
 
@@ -573,7 +635,8 @@ const hostSel = $("#host");
 if (hostSel) {
   hostSel.addEventListener("change", () => {
     selectedSource = hostSel.value;
-    try { localStorage.setItem("gwd.source", selectedSource); } catch (_) {}
+    try { localStorage.setItem("gpesiem.source", selectedSource); } catch (_) {}
+    alertBuf = [];
     refresh().catch(console.error);
   });
 }
@@ -592,22 +655,78 @@ let currentView = "live";
 let reportKind = "vectors";
 let reportRange = "24h";
 try {
-  currentView = localStorage.getItem("gwd.view") || "live";
-  reportKind = localStorage.getItem("gwd.report") || "vectors";
-  reportRange = localStorage.getItem("gwd.range") || "24h";
+  currentView = localStorage.getItem("gpesiem.view") || "live";
+  reportKind = localStorage.getItem("gpesiem.report") || "vectors";
+  reportRange = localStorage.getItem("gpesiem.range") || "24h";
 } catch (_) {}
 
 function setView(v) {
-  currentView = v === "reports" ? "reports" : "live";
-  try { localStorage.setItem("gwd.view", currentView); } catch (_) {}
+  currentView = v === "reports" || v === "settings" ? v : "live";
+  try { localStorage.setItem("gpesiem.view", currentView); } catch (_) {}
   const live = $("#view-live");
   const reps = $("#view-reports");
+  const sets = $("#view-settings");
   if (live) live.hidden = currentView !== "live";
   if (reps) reps.hidden = currentView !== "reports";
+  if (sets) sets.hidden = currentView !== "settings";
   document.querySelectorAll("#view-tabs [data-view]").forEach(b => {
     b.classList.toggle("on", b.dataset.view === currentView);
   });
   if (currentView === "reports") refreshReports().catch(console.error);
+  if (currentView === "settings") loadSettings().catch(console.error);
+}
+
+async function loadSettings() {
+  const data = await j("/api/settings");
+  const st = data.settings || {};
+  const name = $("#set-name");
+  if (name) name.value = st.site_name || "";
+  const home = $("#set-home");
+  if (home) home.value = st.home || "";
+  const homes = $("#set-homes");
+  if (homes) homes.value = st.homes || "";
+  const retain = $("#set-retain");
+  if (retain) retain.value = st.retain || "168h";
+  const tz = $("#set-tz");
+  if (tz) tz.value = st.timezone === "local" ? "local" : "UTC";
+  const meta = $("#settings-meta");
+  if (meta) {
+    meta.textContent = (data.rules || 0) + " rules · GeoIP " + (data.geoip ? "loaded" : "off") +
+      " · ingest token " + (data.token_set ? "set" : "not set");
+  }
+  if (st.site_name) {
+    const brand = document.querySelector(".brand .name");
+    if (brand) brand.textContent = st.site_name;
+    document.title = st.site_name + " — Web Attack Monitor";
+  }
+}
+
+async function saveSettings(ev) {
+  ev.preventDefault();
+  const status = $("#settings-status");
+  const body = {
+    site_name: $("#set-name").value.trim(),
+    home: $("#set-home").value.trim(),
+    homes: $("#set-homes").value.trim(),
+    retain: $("#set-retain").value.trim(),
+    timezone: $("#set-tz").value,
+  };
+  try {
+    const r = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    if (status) status.textContent = "saved";
+    if (body.site_name) {
+      const brand = document.querySelector(".brand .name");
+      if (brand) brand.textContent = body.site_name;
+    }
+    refresh().catch(() => {});
+  } catch (err) {
+    if (status) status.textContent = err.message || "save failed";
+  }
 }
 
 function markReportChrome() {
@@ -752,7 +871,7 @@ if (reportViews) {
     const b = e.target.closest("button[data-report]");
     if (!b) return;
     reportKind = b.dataset.report;
-    try { localStorage.setItem("gwd.report", reportKind); } catch (_) {}
+    try { localStorage.setItem("gpesiem.report", reportKind); } catch (_) {}
     refreshReports().catch(console.error);
   });
 }
@@ -762,13 +881,27 @@ if (reportRangeEl) {
     const b = e.target.closest("button[data-range]");
     if (!b) return;
     reportRange = b.dataset.range;
-    try { localStorage.setItem("gwd.range", reportRange); } catch (_) {}
+    try { localStorage.setItem("gpesiem.range", reportRange); } catch (_) {}
     refreshReports().catch(console.error);
+  });
+}
+
+const settingsForm = $("#settings-form");
+if (settingsForm) settingsForm.addEventListener("submit", saveSettings);
+
+const alertList = $("#alerts");
+if (alertList) {
+  alertList.addEventListener("scroll", () => {
+    if (!alertHasMore || alertLoading) return;
+    if (alertList.scrollTop + alertList.clientHeight > alertList.scrollHeight - 80) {
+      loadAlerts("older").catch(() => {});
+    }
   });
 }
 
 connect();
 setView(currentView);
+loadSettings().catch(() => {});
 refresh().catch(err => {
   $("#alerts").innerHTML = `<div class="empty">${esc(err.message)}</div>`;
 });
