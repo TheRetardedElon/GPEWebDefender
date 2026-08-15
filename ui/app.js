@@ -132,7 +132,7 @@ let sourceList = [];
    equirectangular on this plate, so mid-US latitudes get a small bias. */
 const MAP_PROJ = { padX: 0.045, padTop: 0.10, padBot: 0.07, latMax: 84, latMin: -56 };
 const MAP_ASPECT = 895 / 1600;
-const MAP_VIEW_H = 400;
+const MAP_VIEW_H = 520;
 
 const mapCam = { z: 1, x: 0, y: 0 };
 const MAP_ZMIN = 1, MAP_ZMAX = 8;
@@ -308,6 +308,33 @@ function drawMap() {
 
   const homes = laidOutHomes();
   const now = performance.now();
+
+  const drawn = new Set();
+  let nArc = 0;
+  for (const a of map.arcs) {
+    if (nArc >= 48) break;
+    if (!a.lat && !a.lon) continue;
+    if (!catShown(a.category) || !sourceShown(a.source)) continue;
+    const dest = destHome(a, homes);
+    const key = (a.src_ip || "") + ">" + dest.lat + "," + dest.lon + "|" + (a.category || "");
+    if (drawn.has(key)) continue;
+    drawn.add(key);
+    nArc++;
+    const [x1, y1] = project(a.lat, a.lon, w, h);
+    const [hx, hy] = project(dest.lat, dest.lon, w, h);
+    const [cx, cy] = quadCtrl(x1, y1, hx, hy);
+    const col = catColor(a.category);
+    ctx.save();
+    ctx.setLineDash([5, 9]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(cx, cy, hx, hy);
+    ctx.strokeStyle = hexA(col, 0.38);
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.restore();
+    strokeGlow(ctx, x1, y1, cx, cy, hx, hy, col, 2.1, 0.32);
+  }
 
   for (const a of map.fly) {
     if (!catShown(a.category)) continue;
