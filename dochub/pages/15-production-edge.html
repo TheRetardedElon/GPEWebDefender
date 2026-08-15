@@ -100,15 +100,17 @@ flowchart LR
           <code>fetch</code> / EventSource do not attach Bearer. Fix: after basic auth succeeds,
           nginx <strong>replaces</strong> <code>Authorization</code> with
           <code>Bearer &lt;your token&gt;</code> before <code>proxy_pass</code>.
-          See <code>deploy/nginx-siem.conf.example</code>. Agents never use the public HTTPS ingest path.
+          See <code>deploy/nginx-gwd.conf.example</code>. Agents never use the public HTTPS ingest path.
         </p>
       </section>
 
       <section class="block" id="agent">
         <h2>Agents</h2>
         <p>
-          Same binary. Only hosts that write HTTP access logs need one.
-          DBs, build boxes, and settlement nodes usually do not.
+          Same binary. Hosts with HTTP access logs: <code>--tail</code>.
+          Linux boxes you also want SSH/sudo on: add <code>--journal</code>.
+          A machine with neither does not need an agent.
+          Adding a box is a short checklist in <a href="17-configure.html">17</a>.
         </p>
         <p class="hint"><code>deploy/gpewebdefender-agent.service.example</code> — copy, fill, enable.</p>
       </section>

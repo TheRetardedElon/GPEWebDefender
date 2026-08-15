@@ -74,13 +74,14 @@ gpewebdefender agent \
   --url http://MONITOR:8787 \
   --token SECRET \
   --tail /var/log/nginx/access.log \
+  --journal \
   --name web-1</code></pre>
         <table>
           <thead><tr><th>Detail</th><th>Behavior</th></tr></thead>
           <tbody>
             <tr><td>Auth</td><td><code>Authorization: Bearer</code> must match manager <code>--token</code></td></tr>
             <tr><td>Source</td><td><code>X-SIEM-Source</code> = <code>--name</code> (default: hostname). Appears in the host dropdown and on each alert.</td></tr>
-            <tr><td>Linux auth</td><td>Add <code>/var/log/auth.log</code> (or <code>/var/log/secure</code>) to <code>--tail</code>. Same binary. See <a href="16-reports-and-auth.html">16</a>.</td></tr>
+            <tr><td>Linux auth</td><td><code>--journal</code> (Debian 13+), or <code>--tail /var/log/auth.log</code>. See <a href="16-reports-and-auth.html">16</a> and <a href="17-configure.html">17</a>.</td></tr>
             <tr><td>Body</td><td>Plain text, newline-separated access-log lines</td></tr>
             <tr><td>Flush</td><td>Every 50 lines or 500 ms</td></tr>
             <tr><td>HTTP timeout</td><td>10 seconds per POST</td></tr>

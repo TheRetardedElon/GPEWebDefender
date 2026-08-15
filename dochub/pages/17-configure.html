@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>17 · Configure it — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>17 · Configure it</h1>
+        <p class="lead">
+          Three places, not one giant Settings screen. The dashboard is for how it
+          <em>looks</em>. Each agent is a sensor. Secrets and the firewall stay on the box.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Added 2026-08-15</span>
+          <span class="pill">Operator map</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#where">Where things go</a>
+        <a href="#names">Names vs IPs</a>
+        <a href="#add">Add a host</a>
+        <a href="#sensors">Sensors</a>
+        <a href="#app">App / platform logins</a>
+      </nav>
+
+      <section class="block" id="where">
+        <h2>Where things go</h2>
+        <table>
+          <thead><tr><th>You want to…</th><th>Do it here</th><th>Not here</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Name the dashboard, pick UTC vs local, keep logs 7 or 30 days</td>
+              <td>UI → <strong>Settings</strong></td>
+              <td>Do not edit systemd for this after first boot</td>
+            </tr>
+            <tr>
+              <td>Put a pin on the map for the site, or for each host</td>
+              <td>Settings → main site + one row per host name</td>
+              <td>Not the firewall. Not <code>--homes</code> after Settings has been saved (the page wins)</td>
+            </tr>
+            <tr>
+              <td>Watch nginx / Caddy / Apache on a box</td>
+              <td>Agent <code>--tail /var/log/nginx/access.log</code> (or JSON path)</td>
+              <td>Settings does not list log files</td>
+            </tr>
+            <tr>
+              <td>Watch SSH / sudo on a Linux box</td>
+              <td>Agent <code>--journal</code> (Debian 13+), or <code>--tail /var/log/auth.log</code></td>
+              <td>Not a second product. Same binary.</td>
+            </tr>
+            <tr>
+              <td>See that box in the Hosts dropdown</td>
+              <td>Agent <code>--name web-1</code> (stable name, not the IP)</td>
+              <td>The dropdown is not typed by hand</td>
+            </tr>
+            <tr>
+              <td>Let the agent reach the manager</td>
+              <td>Agent <code>--url http://siem.example:8787</code> <em>or</em> an IP</td>
+              <td>Either works. DNS is nicer if the monitor’s address can change.</td>
+            </tr>
+            <tr>
+              <td>Stop the internet POSTing fake ingest</td>
+              <td>Firewall: allow the ingest port only from <em>those hosts’ IPs</em>. Deny <code>/api/ingest</code> on public HTTPS.</td>
+              <td>Hostnames do not go in <code>ufw</code> / security groups</td>
+            </tr>
+            <tr>
+              <td>Shared ingest secret, listen address, TLS login</td>
+              <td>Env file + systemd + nginx. Generate the token on the box.</td>
+              <td>Settings will not show or edit the token. That is intentional.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="names">
+        <h2>Names vs IPs</h2>
+        <table>
+          <thead><tr><th>Thing</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td>Agent <code>--name</code>, Settings host row, Hosts dropdown</td><td>A short <strong>name</strong> you choose (<code>web-1</code>, <code>edge-eu</code>)</td></tr>
+            <tr><td>Agent <code>--url</code></td><td>Hostname <em>or</em> IP of the manager. Both are valid.</td></tr>
+            <tr><td>Firewall / allowlist</td><td><strong>IPs</strong> (or a private network). Not DNS names.</td></tr>
+            <tr><td>Map pin</td><td>Country code or <code>lat,lon</code>. Not the server’s public IP.</td></tr>
+            <tr><td>Attacker column in the UI</td><td>Client IPs from the log. You do not configure those.</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          You never type a monitored box’s IP into Settings. The agent on that box ships the logs.
+          Settings only needs the <em>name</em> if you want a separate pin.
+        </p>
+      </section>
+
+      <section class="block" id="add">
+        <h2>Add a host (checklist)</h2>
+        <ol>
+          <li>Copy the same binary to the new box.</li>
+          <li>Give it the <strong>same</strong> ingest token as the manager.</li>
+          <li>Start the agent: <code>--url</code> (manager) · <code>--name</code> (stable label) · <code>--tail</code> and/or <code>--journal</code>.</li>
+          <li>On the manager, allow that box’s <strong>IP</strong> to the ingest port.</li>
+          <li>Open the UI. The name should appear in <strong>Hosts</strong> after the first line arrives.</li>
+          <li>Optional: Settings → add a row with that same name and a map location.</li>
+        </ol>
+        <div class="callout info">
+          <strong>No HTTP logs?</strong>
+          A Linux box can still run <code>--journal</code> only. It will show up under Reports → Auth · Linux.
+          A database with no SSH and no web server does not need an agent.
+        </div>
+      </section>
+
+      <section class="block" id="sensors">
+        <h2>Sensors (what each agent can see)</h2>
+        <table>
+          <thead><tr><th>Sensor</th><th>Flag</th><th>Shows up as</th></tr></thead>
+          <tbody>
+            <tr><td>HTTP access log</td><td><code>--tail</code> path(s)</td><td>Live feed, attack map, Reports → vectors / Auth · Web</td></tr>
+            <tr><td>sshd / sudo / PAM</td><td><code>--journal</code> or <code>--tail /var/log/auth.log</code></td><td>Reports → Auth · Linux</td></tr>
+            <tr><td>Your app’s login API</td><td>App POSTs JSON (below). No extra agent.</td><td>Reports → Auth · App</td></tr>
+          </tbody>
+        </table>
+        <p>
+          The agent does not scan the network and does not walk the disk.
+          If a file is not tailed and journald is off, that host is silent.
+        </p>
+      </section>
+
+      <section class="block" id="app">
+        <h2>App / platform login failures</h2>
+        <p>
+          Access logs cannot see a failed password in a POST body. The application
+          (or API gateway) POSTs a small JSON event. Full field list: <a href="16-reports-and-auth.html">16</a>.
+          Never send the password.
+        </p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>POST /api/ingest
+Authorization: Bearer SECRET
+Content-Type: application/json
+X-SIEM-Source: app-api
+
+{ "kind": "applogin", "src_ip": "203.0.113.9", "user": "alice",
+  "path": "/api/login", "status": 401, "outcome": "fail", "method": "LOGIN" }</code></pre>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 17 · back to <a href="../index.html">hub home</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>
