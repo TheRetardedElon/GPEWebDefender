@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>16 · Reports &amp; auth — gpesiem</title>
+  <title>16 · Reports &amp; auth — GPEWebDefender</title>
   <link rel="stylesheet" href="../css/dochub.css" />
 </head>
 <body data-base="..">
@@ -71,7 +71,7 @@
           Same agent, extra tail. We keep sshd failures / accepts, invalid users,
           sudo auth failures, and a few PAM / console lines. Cron and kernel stay on the floor.
         </p>
-        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpesiem agent \
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpewebdefender agent \
   --url http://MONITOR:8787 \
   --token SECRET \
   --name web-1 \
@@ -83,7 +83,7 @@
 # Debian 13+ is often journald-only — use --journal.
 
 # Linux-only box (no HTTP):
-gpesiem agent --url http://MONITOR:8787 --token SECRET --name db-1 --journal</code></pre>
+gpewebdefender agent --url http://MONITOR:8787 --token SECRET --name db-1 --journal</code></pre>
         <div class="callout info">
           <strong>Still not OSSEC</strong>
           This is an auth parser, not FIM, not rootkit, not every facility. If the line is not a login, we drop it.
@@ -157,7 +157,7 @@ X-SIEM-Source: app-api
         </table>
       </section>
 
-      <footer class="foot">gpesiem DocHub · 16 · back to <a href="../index.html">hub home</a></footer>
+      <footer class="foot">GPEWebDefender DocHub · 16 · back to <a href="../index.html">hub home</a></footer>
     </main>
   </div>
   <script src="../js/nav.js"></script>

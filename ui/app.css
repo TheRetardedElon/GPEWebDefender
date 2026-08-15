@@ -113,6 +113,27 @@ button, input { font: inherit; color: inherit; }
   background: var(--bg-3); border: 1px solid var(--copper); border-radius: 8px;
   padding: 7px 14px; cursor: pointer; color: var(--ink);
 }
+.who { color: var(--ink); font-size: 12px; }
+.acct-form { display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
+.acct-form .field { margin: 0; }
+.user-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.user-actions button { font-size: 12px; }
+.login-page {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.login-card {
+  width: 100%; max-width: 420px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px 22px 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.login-card .brand { margin-bottom: 4px; }
+.login-card .field { margin: 0; }
+.login-card button[type="submit"] {
+  background: var(--bg-3); border: 1px solid var(--copper); border-radius: 8px;
+  padding: 8px 16px; cursor: pointer; color: var(--ink);
+}
 .anum { color: var(--copper); font-variant-numeric: tabular-nums; font-weight: 650; font-size: 12px; padding-top: 2px; }
 .report-bar {
   display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -131,6 +152,12 @@ button, input { font: inherit; color: inherit; }
 }
 .rpt td { padding: 8px 12px; border-bottom: 1px solid #2c282055; vertical-align: top; }
 .rpt tr:hover td { background: var(--bg-3); }
+.th-sort {
+  background: none; border: 0; padding: 0; color: inherit;
+  font: inherit; letter-spacing: inherit; text-transform: inherit;
+  cursor: pointer;
+}
+.th-sort:hover { color: var(--ink); }
 .rpt .mono { font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
 .hours { display: flex; align-items: flex-end; gap: 3px; height: 72px; padding: 8px 12px 12px; }
 .hours i {

@@ -4,9 +4,22 @@ let severity = "all";
 let query = "";
 let seen = new Set();
 
-async function j(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(await r.text());
+let currentUser = null;
+
+function goLogin() {
+  location.href = "/login";
+}
+
+async function j(url, opts) {
+  const r = await fetch(url, Object.assign({ credentials: "same-origin" }, opts || {}));
+  if (r.status === 401) {
+    goLogin();
+    throw new Error("unauthorized");
+  }
+  if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+  if (r.status === 204) return null;
+  const ct = r.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) return null;
   return r.json();
 }
 
@@ -676,7 +689,10 @@ function setView(v) {
     b.classList.toggle("on", b.dataset.view === currentView);
   });
   if (currentView === "reports") refreshReports().catch(console.error);
-  if (currentView === "settings") loadSettings().catch(console.error);
+  if (currentView === "settings") {
+    loadSettings().catch(console.error);
+    loadUsers().catch(() => {});
+  }
 }
 
 function parseHomesStr(s) {
@@ -936,6 +952,16 @@ if (reportRangeEl) {
   });
 }
 
+let searchOldest = false;
+try { searchOldest = localStorage.getItem("gpesiem.searchSort") === "oldest"; } catch (_) {}
+
+function paintSearchSort() {
+  const dir = $("#search-when-dir");
+  const btn = $("#search-when");
+  if (dir) dir.textContent = searchOldest ? "▴" : "▾";
+  if (btn) btn.title = searchOldest ? "Oldest first — click for newest" : "Newest first — click for oldest";
+}
+
 async function runSearch(ev) {
   if (ev) ev.preventDefault();
   const params = new URLSearchParams();
@@ -947,7 +973,9 @@ async function runSearch(ev) {
   if (ip) params.set("ip", ip);
   if (host) params.set("host", host);
   if (kind) params.set("kind", kind);
+  params.set("sort", searchOldest ? "oldest" : "newest");
   params.set("limit", "50");
+  paintSearchSort();
   const meta = $("#search-meta");
   const body = $("#search-body");
   if (!q && !ip && !host && !kind) {
@@ -965,7 +993,7 @@ async function runSearch(ev) {
     }
     body.innerHTML = hits.map(h => `<tr>
       <td>${h.num ? "#" + h.num : h.bucket}</td>
-      <td>${h.time ? ago(h.time) : ""}</td>
+      <td title="${esc(h.time || "")}">${h.time ? ago(h.time) : ""}</td>
       <td>${esc(h.title || h.kind || h.category || "")}</td>
       <td class="mono">${esc(h.src_ip || "")}${h.user ? " · " + esc(h.user) : ""}</td>
       <td class="mono">${esc(h.path || h.url || "")}</td>
@@ -978,11 +1006,191 @@ async function runSearch(ev) {
 
 const searchForm = $("#search-form");
 if (searchForm) searchForm.addEventListener("submit", runSearch);
+const searchWhen = $("#search-when");
+if (searchWhen) {
+  paintSearchSort();
+  searchWhen.addEventListener("click", () => {
+    searchOldest = !searchOldest;
+    try { localStorage.setItem("gpesiem.searchSort", searchOldest ? "oldest" : "newest"); } catch (_) {}
+    paintSearchSort();
+    runSearch().catch(console.error);
+  });
+}
+
+function paintWho() {
+  const who = $("#whoami");
+  const out = $("#logout");
+  const acct = $("#acct-block");
+  const saveBtn = $("#settings-form button[type=submit]");
+  if (!currentUser) {
+    if (who) who.hidden = true;
+    if (out) out.hidden = true;
+    if (acct) acct.hidden = true;
+    return;
+  }
+  if (who) {
+    who.hidden = false;
+    who.textContent = currentUser.username + " · " + currentUser.role;
+  }
+  if (out) out.hidden = false;
+  if (acct) acct.hidden = false;
+  if (saveBtn && currentUser.role !== "admin") {
+    saveBtn.disabled = true;
+    saveBtn.title = "Admins only";
+  }
+}
+
+async function bootAuth() {
+  let st;
+  try {
+    const r = await fetch("/api/auth-status", { credentials: "same-origin" });
+    st = await r.json();
+  } catch (_) {
+    return;
+  }
+  if (!st || !st.users) return;
+  try {
+    currentUser = await j("/api/me");
+    paintWho();
+  } catch (_) {}
+}
+
+async function loadUsers() {
+  const block = $("#users-block");
+  if (!block || !currentUser || currentUser.role !== "admin") {
+    if (block) block.hidden = true;
+    return;
+  }
+  block.hidden = false;
+  const body = $("#users-body");
+  try {
+    const list = await j("/api/users");
+    if (!list || !list.length) {
+      body.innerHTML = `<tr><td colspan="4" class="empty">No users.</td></tr>`;
+      return;
+    }
+    body.innerHTML = list.map(u => {
+      const last = u.last_login ? ago(u.last_login) : "never";
+      const dis = u.disabled ? " · disabled" : "";
+      return `<tr data-id="${u.id}">
+        <td>${esc(u.username)}${dis}</td>
+        <td>${esc(u.role)}</td>
+        <td>${esc(last)}</td>
+        <td class="user-actions">
+          <button type="button" class="btn-quiet" data-act="reset">Reset password</button>
+          <button type="button" class="btn-quiet" data-act="toggle">${u.disabled ? "Enable" : "Disable"}</button>
+          <button type="button" class="btn-quiet" data-act="del">Delete</button>
+        </td>
+      </tr>`;
+    }).join("");
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="4" class="empty">${esc(err.message)}</td></tr>`;
+  }
+}
+
+async function changeOwnPassword(ev) {
+  ev.preventDefault();
+  const status = $("#pw-status");
+  const cur = $("#pw-cur").value;
+  const next = $("#pw-new").value;
+  const next2 = $("#pw-new2").value;
+  if (next !== next2) {
+    status.textContent = "passwords do not match";
+    return;
+  }
+  try {
+    await j("/api/me/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current: cur, next }),
+    });
+    $("#pw-form").reset();
+    status.textContent = "password changed";
+  } catch (err) {
+    status.textContent = err.message || "failed";
+  }
+}
+
+async function createOperator(ev) {
+  ev.preventDefault();
+  const status = $("#user-status");
+  try {
+    await j("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: $("#nu-name").value.trim(),
+        password: $("#nu-pass").value,
+        role: $("#nu-role").value,
+      }),
+    });
+    $("#user-form").reset();
+    status.textContent = "created";
+    await loadUsers();
+  } catch (err) {
+    status.textContent = err.message || "failed";
+  }
+}
+
+async function userRowAction(ev) {
+  const btn = ev.target.closest("button[data-act]");
+  if (!btn) return;
+  const tr = btn.closest("tr");
+  const id = tr && tr.dataset.id;
+  if (!id) return;
+  const act = btn.dataset.act;
+  const status = $("#user-status");
+  try {
+    if (act === "del") {
+      if (!confirm("Delete this operator?")) return;
+      await j("/api/users/" + id, { method: "DELETE" });
+    } else if (act === "toggle") {
+      const disabled = !/Enable/.test(btn.textContent);
+      await j("/api/users/" + id + "/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disabled }),
+      });
+    } else if (act === "reset") {
+      const next = prompt("New password (min 12 characters)");
+      if (!next) return;
+      await j("/api/users/" + id + "/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ next }),
+      });
+    }
+    status.textContent = "updated";
+    await loadUsers();
+  } catch (err) {
+    status.textContent = err.message || "failed";
+  }
+}
+
+async function doLogout() {
+  try {
+    await fetch("/api/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+  } catch (_) {}
+  goLogin();
+}
 
 const settingsForm = $("#settings-form");
 if (settingsForm) settingsForm.addEventListener("submit", saveSettings);
 const homeAdd = $("#home-add");
 if (homeAdd) homeAdd.addEventListener("click", () => addHomeRow("", ""));
+const pwForm = $("#pw-form");
+if (pwForm) pwForm.addEventListener("submit", changeOwnPassword);
+const userForm = $("#user-form");
+if (userForm) userForm.addEventListener("submit", createOperator);
+const usersBody = $("#users-body");
+if (usersBody) usersBody.addEventListener("click", userRowAction);
+const logoutBtn = $("#logout");
+if (logoutBtn) logoutBtn.addEventListener("click", doLogout);
 
 const alertList = $("#alerts");
 if (alertList) {
@@ -994,10 +1202,14 @@ if (alertList) {
   });
 }
 
-connect();
-setView(currentView);
-loadSettings().catch(() => {});
-refresh().catch(err => {
-  $("#alerts").innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+bootAuth().then(() => {
+  connect();
+  setView(currentView);
+  loadSettings().catch(() => {});
+  loadUsers().catch(() => {});
+  refresh().catch(err => {
+    const box = $("#alerts");
+    if (box) box.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+  });
+  setInterval(() => refresh().catch(() => {}), 8000);
 });
-setInterval(() => refresh().catch(() => {}), 8000);

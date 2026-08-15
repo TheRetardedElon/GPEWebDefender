@@ -109,6 +109,9 @@ CREATE INDEX IF NOT EXISTS al_source ON alerts(source);
 	if err := s.backfillAlertNums(); err != nil {
 		return err
 	}
+	if err := s.initUsers(); err != nil {
+		return err
+	}
 	_, _ = s.db.Exec(`UPDATE events SET kind = 'tenantlogin' WHERE lower(IFNULL(kind,'')) IN
 		('ownerlogin','tenant','owner','siteowner','site-owner','site_owner')`)
 	return s.initSearch()

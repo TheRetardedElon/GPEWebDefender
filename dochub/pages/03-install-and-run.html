@@ -40,18 +40,18 @@
           <tbody>
             <tr>
               <td>Windows</td>
-              <td><code>go build -o gpewebdefender.exe .\cmd\gpewebdefender</code></td>
+              <td><code>go build -o gpewebdefender.exe .\cmd\gpesiem</code></td>
               <td><code>gpewebdefender.exe</code></td>
             </tr>
             <tr>
               <td>Linux</td>
-              <td><code>go build -o gpewebdefender ./cmd/gpewebdefender</code></td>
-              <td><code>gpewebdefender</code></td>
+              <td><code>go build -o gpesiem ./cmd/gpesiem</code></td>
+              <td><code>gpesiem</code></td>
             </tr>
             <tr>
               <td>Windows → Linux</td>
               <td><code>set GOOS=linux</code> · <code>set GOARCH=amd64</code> · <code>set CGO_ENABLED=0</code> · same <code>go build</code></td>
-              <td><code>gpewebdefender-linux-amd64</code> (~16 MB)</td>
+              <td><code>gpesiem-linux-amd64</code> (~16 MB)</td>
             </tr>
           </tbody>
         </table>
@@ -138,7 +138,7 @@
         <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>$env:GOOS="linux"
 $env:GOARCH="amd64"
 $env:CGO_ENABLED="0"
-go build -o gpewebdefender-linux-amd64 .\cmd\gpewebdefender</code></pre>
+go build -o gpesiem-linux-amd64 .\cmd\gpesiem</code></pre>
         <p class="hint">Copy the file to the Linux box, <code>chmod +x</code>, run. No Go install required on the server.</p>
       </section>
 

@@ -28,7 +28,7 @@
       <nav class="jump-nav">
         <a href="#config">What you configure</a>
         <a href="#topo">Topology</a>
-        <a href="#auth">Two secrets</a>
+        <a href="#auth">Three secrets</a>
         <a href="#fix">Basic + Bearer</a>
         <a href="#agent">Agents</a>
         <a href="#geo">GeoIP</a>
@@ -82,12 +82,13 @@ flowchart LR
       </section>
 
       <section class="block" id="auth">
-        <h2>Two different secrets</h2>
+        <h2>Three different secrets</h2>
         <table>
           <thead><tr><th>Secret</th><th>Who</th><th>Lives</th></tr></thead>
           <tbody>
-            <tr><td>UI basic auth</td><td>Humans</td><td>nginx htpasswd on the monitor only</td></tr>
-            <tr><td>Ingest token</td><td>Manager + agents</td><td><code>/etc/gpewebdefender/token</code> and <code>/etc/gpewebdefender/env</code> (mode 640)</td></tr>
+            <tr><td>Operator account</td><td>Humans</td><td>Argon2id in the manager SQLite. Create / rotate in Settings. <a href="18-operator-accounts.html">18</a>.</td></tr>
+            <tr><td>UI basic auth (optional)</td><td>Humans</td><td>nginx htpasswd on the monitor only. Extra gate, not the app password.</td></tr>
+            <tr><td>Ingest token</td><td>Manager + agents</td><td><code>/etc/gpewebdefender/token</code> and <code>/etc/gpewebdefender/env</code> (mode 640). Never grants user-admin.</td></tr>
           </tbody>
         </table>
       </section>
@@ -95,11 +96,11 @@ flowchart LR
       <section class="block" id="fix">
         <h2>Basic + Bearer (do this or the UI 401-loops)</h2>
         <p>
-          nginx basic auth and the app token both want the <code>Authorization</code> header.
-          After login the browser only sends <strong>Basic</strong>. The dashboard
-          <code>fetch</code> / EventSource do not attach Bearer. Fix: after basic auth succeeds,
-          nginx <strong>replaces</strong> <code>Authorization</code> with
-          <code>Bearer &lt;your token&gt;</code> before <code>proxy_pass</code>.
+          nginx basic auth and the ingest token both want the <code>Authorization</code> header.
+          After operator accounts exist, the dashboard uses a session cookie and does
+          <strong>not</strong> need Bearer on UI APIs. If you still inject Bearer (so the
+          pre-account bootstrap and any leftover clients keep working), that is fine —
+          ingest Bearer is ignored for everything except <code>/api/ingest</code>.
           See <code>deploy/nginx-gwd.conf.example</code>. Agents never use the public HTTPS ingest path.
         </p>
       </section>
@@ -132,6 +133,7 @@ flowchart LR
           <li>Open the ingest port to the whole internet</li>
           <li>Expose <code>/api/ingest</code> on the public HTTPS vhost</li>
           <li>Ship OSSEC/Wazuh “for completeness”</li>
+          <li>Treat the ingest token as a human login, or leave <code>SIEM_ADMIN_PASSWORD</code> in the env file</li>
         </ul>
       </section>
 

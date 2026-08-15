@@ -22,10 +22,10 @@
         </p>
         <div class="meta-row">
           <span class="pill live"><strong>Product</strong> web-attack monitor</span>
-          <span class="pill"><strong>Version</strong> 0.4.0</span>
+          <span class="pill"><strong>Version</strong> 0.6.0</span>
           <span class="pill warn"><strong>Not</strong> OSSEC source</span>
-          <span class="pill">Chapters 00–17</span>
-          <span class="pill">Updated <span data-generated>2026-08-15</span></span>
+          <span class="pill">Chapters 00–18</span>
+          <span class="pill">Updated <span data-generated>2026-08-14</span></span>
         </div>
       </header>
 
@@ -37,18 +37,14 @@
         <a href="pages/06-detection-engine.html"><strong>06</strong></a> +
         <a href="pages/07-rule-catalog.html"><strong>07</strong></a>.
         Putting it on a server is <a href="pages/10-deploy.html"><strong>10</strong></a>.
-        What goes in Settings vs the agent vs the firewall is
-        <a href="pages/17-configure.html"><strong>17</strong></a>.
       </div>
       <div class="callout good">
         <strong>Status (2026-08-14)</strong>
-        v0.4.0: one Go binary, YAML rules (web attacks, snoop, canaries, Linux/app auth),
-        SQLite, Live / Reports / Settings UI, optional GeoIP map.
+        v0.1.0: one Go binary, <strong>41 rules</strong> (injection, recon, snoop, canary, modern probes),
+        SQLite, live UI, color-filtered attack map, Windows + Linux.
         Comfortable on a dedicated <strong>2 CPU / 2 GB</strong> box.
-        Demo is fake. Live traffic starts when an agent (or <code>--tail</code> / <code>--journal</code>) ships real logs.
-        This DocHub is also served from the manager at <code>/docs/</code>. Start at
-        <a href="pages/00-what-this-is.html">00</a>, then <a href="pages/03-install-and-run.html">03</a>,
-        <a href="pages/10-deploy.html">10</a>, <a href="pages/17-configure.html">17</a>.
+        Demo is fake. Live traffic starts when an agent (or <code>--tail</code>) ships a real access log.
+        This DocHub is also served from the manager at <code>/docs/</code>.
       </div>
 
       <section class="block">
@@ -189,12 +185,6 @@ flowchart TB
             <p>Vector mix, web 401/403, Linux sshd, application login JSON ingest.</p>
             <div class="tags"><span class="tag live">reports</span></div>
           </a>
-          <a class="card" href="pages/17-configure.html">
-            <div class="num">17</div>
-            <h3>Configure it</h3>
-            <p>Settings vs agent vs firewall. Names vs IPs. Checklist to add a host.</p>
-            <div class="tags"><span class="tag live">ops</span></div>
-          </a>
         </div>
       </section>
 
@@ -234,7 +224,7 @@ flowchart TB
       </section>
 
       <footer class="foot">
-        GPEWebDefender DocHub · chapters 00–16 · configure your own hosts. Nothing inventory-specific in this tree.
+        gpewebdefender DocHub · chapters 00–16 · configure your own hosts. Nothing inventory-specific in this tree.
         Not OSSEC. Not a WAF. Develop carefully.
       </footer>
     </main>

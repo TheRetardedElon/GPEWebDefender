@@ -41,7 +41,7 @@
             <tr>
               <td><code>gpewebdefender serve</code></td>
               <td>Manager: optional tail + UI + API + detection</td>
-              <td><code>cmd/gpewebdefender/main.go</code> → <code>serveCmd</code></td>
+              <td><code>cmd/gpesiem/main.go</code> → <code>serveCmd</code></td>
             </tr>
             <tr>
               <td><code>gpewebdefender demo</code></td>
@@ -101,9 +101,9 @@ flowchart TB
       <section class="block" id="tree">
         <h2>Repo tree</h2>
         <div class="tree">
-          <div class="tree-node root">gpewebdefender <span class="path">module gpewebdefender</span></div>
+          <div class="tree-node root">gpesiem <span class="path">module gpewebdefender</span></div>
           <div class="tree-children">
-            <div class="tree-node"><span class="name">cmd/gpewebdefender</span><span class="path">main.go</span><span class="desc">CLI: serve · demo · agent · version</span></div>
+            <div class="tree-node"><span class="name">cmd/gpesiem</span><span class="path">main.go</span><span class="desc">CLI: serve · demo · agent · version</span></div>
             <div class="tree-node"><span class="name">internal/parse</span><span class="desc">Combined + JSON → Event. Double URL-decode.</span></div>
             <div class="tree-node"><span class="name">internal/detect</span><span class="desc">YAML rules, pattern + threshold windows.</span></div>
             <div class="tree-node"><span class="name">internal/store</span><span class="desc">SQLite events/alerts, prune, stats.</span></div>

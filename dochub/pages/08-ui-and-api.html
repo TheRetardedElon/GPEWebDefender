@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>08 · UI &amp; API — gpesiem</title>
+  <title>08 · UI &amp; API — GPEWebDefender</title>
   <link rel="stylesheet" href="../css/dochub.css" />
 </head>
 <body data-base="..">
@@ -29,7 +29,7 @@
         <table>
           <thead><tr><th>Surface</th><th>Does</th></tr></thead>
           <tbody>
-            <tr><td>Live / Reports / Settings</td><td>Live is the map + numbered feed. Reports: vectors + auth. Settings is display, map pins, retention — not tokens or log paths. See <a href="17-configure.html">17</a>.</td></tr>
+            <tr><td>Live / Reports / Search / Settings</td><td>Live is the map + numbered feed. Reports: vectors + auth. Search is FTS5. Settings is display, map pins, retention, and operator accounts. Not the ingest token or log paths. See <a href="17-configure.html">17</a> and <a href="18-operator-accounts.html">18</a>.</td></tr>
             <tr><td>Host dropdown</td><td><strong>All hosts</strong> (fleet map + stats) or one agent <code>--name</code>. Remembered in the browser.</td></tr>
             <tr><td>Stat cards</td><td>Events/1h, alerts/1h, critical/1h, unique attacker IPs/1h, rules loaded. Follow the host filter.</td></tr>
             <tr><td>Live alerts</td><td>Filter by host + severity + search (IP, path, rule). Click a row for detail.</td></tr>
@@ -58,8 +58,9 @@
             <tr><td>GET</td><td><code>/api/reports/auth</code></td><td>token if set</td><td><code>channel=web|linux|app</code>, <code>since</code>, <code>source</code>.</td></tr>
             <tr><td>GET</td><td><code>/api/stats</code></td><td>token if set</td><td>Dashboard snapshot. Query: <code>source</code></td></tr>
             <tr><td>GET</td><td><code>/api/alerts</code></td><td>token if set</td><td>Paged. Query: <code>q</code> (also <code>#123</code>), <code>severity</code>, <code>ip</code>, <code>source</code>, <code>since</code>, <code>limit</code>, <code>before</code>/<code>after</code> (alert number). Body: <code>{alerts,has_more,oldest_num,newest_num}</code></td></tr>
-            <tr><td>GET/PUT</td><td><code>/api/settings</code></td><td>token if set</td><td>Site name, <code>home</code>, <code>homes</code>, <code>retain</code>, <code>timezone</code>. Token and listen stay in flags/env.</td></tr>
-            <tr><td>GET</td><td><code>/api/search</code></td><td>token if set</td><td>FTS5. Query: <code>q</code>, <code>ip</code>, <code>host</code>, <code>source</code>, <code>kind</code>, <code>limit</code>.</td></tr>
+            <tr><td>GET/PUT</td><td><code>/api/settings</code></td><td>session (admin to PUT)</td><td>Site name, <code>home</code>, <code>homes</code>, <code>retain</code>, <code>timezone</code>. Token and listen stay in flags/env.</td></tr>
+            <tr><td>GET / POST</td><td><code>/login</code>, <code>/api/login</code>, <code>/api/setup</code>, <code>/api/users</code>, <code>/api/me</code></td><td>see 18</td><td>Operator accounts. Ingest Bearer does not unlock these after the first user exists.</td></tr>
+            <tr><td>GET</td><td><code>/api/search</code></td><td>session (or token if no users)</td><td>FTS5. Query: <code>q</code>, <code>ip</code>, <code>host</code>, <code>source</code>, <code>kind</code>, <code>limit</code>, <code>sort=newest|oldest</code> (default newest). Click <strong>When</strong> in the UI to flip it.</td></tr>
             <tr><td>GET</td><td><code>/api/events</code></td><td>token if set</td><td><code>q</code>, <code>ip</code>, <code>source</code>, <code>limit</code></td></tr>
             <tr><td>GET</td><td><code>/api/attackers</code></td><td>token if set</td><td><code>since</code>, <code>limit</code>, <code>source</code></td></tr>
             <tr><td>GET</td><td><code>/api/rules</code></td><td>token if set</td><td>Loaded rule metadata (no regex text)</td></tr>
@@ -68,8 +69,10 @@
           </tbody>
         </table>
         <p class="hint">
-          Token: <code>Authorization: Bearer SECRET</code> or <code>?token=SECRET</code>.
-          Empty <code>--token</code> means the API is open to anyone who can reach the bind address.
+          Ingest token: <code>Authorization: Bearer SECRET</code> or <code>?token=SECRET</code> on
+          <code>/api/ingest</code> only (after operator accounts exist). Empty <code>--token</code>
+          with zero users means the API is open to anyone who can reach the bind address.
+          People use a session cookie — <a href="18-operator-accounts.html">18</a>.
         </p>
       </section>
 
@@ -83,7 +86,7 @@ curl -sH "Authorization: Bearer SECRET" ^
   http://127.0.0.1:8787/api/ingest</code></pre>
       </section>
 
-      <footer class="foot">gpesiem DocHub · 08 · next: <a href="09-agent-and-hosts.html">09 · Agent &amp; hosts</a></footer>
+      <footer class="foot">GPEWebDefender DocHub · 08 · next: <a href="09-agent-and-hosts.html">09 · Agent &amp; hosts</a></footer>
     </main>
   </div>
   <script src="../js/nav.js"></script>

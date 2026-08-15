@@ -27,7 +27,7 @@ import (
 	"gpewebdefender/rules"
 )
 
-const version = "0.5.0"
+const version = "0.6.0"
 
 func main() {
 	log.SetFlags(0)
@@ -95,6 +95,7 @@ func serveCmd(args []string) {
 	}
 	defer pipe.Store.Close()
 	seedAndApplySettings(pipe, *home, *homes, *retain)
+	bootstrapAdmin(pipe.Store)
 
 	go pruneLoop(ctx, pipe.Store)
 
@@ -365,7 +366,7 @@ func seedAndApplySettings(pipe *pipeline.Pipeline, home, homes string, retain ti
 		cur.Homes = homes
 	}
 	if cur.Retain == "" {
-		cur.Retain = retain.String()
+		cur.Retain = fmt.Sprintf("%dh", int(retain.Hours()))
 	}
 	if err := pipe.Store.PutSettings(cur); err != nil {
 		log.Printf("settings save: %v", err)
@@ -378,6 +379,28 @@ func seedAndApplySettings(pipe *pipeline.Pipeline, home, homes string, retain ti
 	}
 }
 
+func bootstrapAdmin(st *store.Store) {
+	user := strings.TrimSpace(os.Getenv("SIEM_ADMIN_USER"))
+	pass := os.Getenv("SIEM_ADMIN_PASSWORD")
+	if user == "" && pass == "" {
+		if st.UserCount() == 0 {
+			log.Print("no operator accounts yet — open /login to create the first admin")
+		}
+		return
+	}
+	if user == "" || pass == "" {
+		log.Fatal("SIEM_ADMIN_USER and SIEM_ADMIN_PASSWORD must be set together")
+	}
+	if st.UserCount() > 0 {
+		log.Print("operator accounts already exist — remove SIEM_ADMIN_PASSWORD from the env file")
+		return
+	}
+	if _, err := st.CreateUser(user, pass, "admin"); err != nil {
+		log.Fatalf("bootstrap admin: %v", err)
+	}
+	log.Print("created first admin from SIEM_ADMIN_USER — remove SIEM_ADMIN_PASSWORD from the env file now")
+}
+
 func pruneLoop(ctx context.Context, st *store.Store) {
 	t := time.NewTicker(30 * time.Minute)
 	defer t.Stop()
@@ -385,6 +408,7 @@ func pruneLoop(ctx context.Context, st *store.Store) {
 		if err := st.Prune(st.Retain()); err != nil {
 			log.Printf("prune: %v", err)
 		}
+		st.SweepSessions()
 		select {
 		case <-ctx.Done():
 			return

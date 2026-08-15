@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>18 · Operator accounts — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>18 · Operator accounts</h1>
+        <p class="lead">
+          People who open the dashboard are not agents. Operator passwords live in
+          SQLite as Argon2id hashes. The ingest token never creates, lists, or
+          resets those accounts.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Added 2026-08-15</span>
+          <span class="pill">v0.6.0</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#why">Why this exists</a>
+        <a href="#first">First admin</a>
+        <a href="#roles">Roles</a>
+        <a href="#how">How it is stored</a>
+        <a href="#api">API</a>
+        <a href="#edge">With nginx</a>
+        <a href="#dont">Do not</a>
+      </nav>
+
+      <section class="block" id="why">
+        <h2>Why this exists</h2>
+        <p>
+          The ingest token is a <em>machine</em> secret. Every agent has it.
+          If that token could also change the operator password or create admins,
+          a stolen agent is a stolen dashboard. So after the first operator exists:
+        </p>
+        <ul>
+          <li><code>POST /api/ingest</code> still uses <code>Authorization: Bearer</code> (the ingest token).</li>
+          <li>Every other <code>/api/*</code> path (except health / login / setup / auth-status) needs a session cookie.</li>
+          <li>Settings → Operators is how you create users and rotate <em>your</em> password.</li>
+        </ul>
+        <div class="callout info">
+          <strong>nginx htpasswd is optional extra</strong>
+          An outer basic-auth gate is still a good idea on a public hostname.
+          It is not a substitute for operator accounts. This chapter is the in-app login.
+        </div>
+      </section>
+
+      <section class="block" id="first">
+        <h2>Create the first admin</h2>
+        <p>Pick one. Do not leave the manager reachable from the internet with zero users.</p>
+        <table>
+          <thead><tr><th>How</th><th>When</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Open <code>/login</code> in the browser. The form becomes “create the first admin”.</td>
+              <td>Default. The manager must not be on a public bind without nginx / a firewall.</td>
+            </tr>
+            <tr>
+              <td>Set <code>SIEM_ADMIN_USER</code> and <code>SIEM_ADMIN_PASSWORD</code> in the env file, start once, then <strong>delete the password line</strong>.</td>
+              <td>Headless / first boot. The process logs a reminder.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          Password rules: at least 12 characters, not the username, not a short list of common strings.
+          After the first admin exists, <code>POST /api/setup</code> returns 409.
+        </p>
+      </section>
+
+      <section class="block" id="roles">
+        <h2>Roles</h2>
+        <table>
+          <thead><tr><th>Role</th><th>Can</th><th>Cannot</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>admin</code></td>
+              <td>Dashboard, search, reports, Settings writes, create / disable / delete users, reset their passwords, change own password</td>
+              <td>Delete or disable the last remaining admin. See or set the ingest token.</td>
+            </tr>
+            <tr>
+              <td><code>viewer</code></td>
+              <td>Dashboard, search, reports, change own password</td>
+              <td>Create users, save Settings, reset anyone else’s password</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="how">
+        <h2>How it is stored</h2>
+        <table>
+          <thead><tr><th>Thing</th><th>How</th></tr></thead>
+          <tbody>
+            <tr><td>Password</td><td>Argon2id (<code>t=3</code>, 32&nbsp;MiB, <code>p=2</code>). Never logged. Never returned by the API.</td></tr>
+            <tr><td>Session</td><td>32-byte random token. Only the SHA-256 is stored. Cookie <code>siem_session</code>, HttpOnly, SameSite=Lax, 12 hours, <code>Secure</code> when the request is HTTPS.</td></tr>
+            <tr><td>Lockout</td><td>8 failed logins for the same username + IP in 15 minutes → HTTP 429. Dummy Argon2 still runs on unknown usernames so timing does not leak whether the name exists.</td></tr>
+            <tr><td>Password change</td><td>Requires the current password. All other sessions for that user are revoked. A new cookie is issued to the browser that just rotated.</td></tr>
+            <tr><td>Admin reset</td><td>Admin sets a new password for someone else. That user’s sessions die. They sign in again.</td></tr>
+            <tr><td>CSRF</td><td>Mutating auth routes require <code>Content-Type: application/json</code>. Combined with SameSite=Lax, a cross-site form post cannot log in or create users.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="api">
+        <h2>API</h2>
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Who</th></tr></thead>
+          <tbody>
+            <tr><td>GET</td><td><code>/login</code></td><td>Open. Setup form if zero users.</td></tr>
+            <tr><td>GET</td><td><code>/api/auth-status</code></td><td>Open. <code>{users, setup}</code> only.</td></tr>
+            <tr><td>POST</td><td><code>/api/setup</code></td><td>Open only while <code>users == 0</code></td></tr>
+            <tr><td>POST</td><td><code>/api/login</code></td><td>Open. Sets the session cookie.</td></tr>
+            <tr><td>POST</td><td><code>/api/logout</code></td><td>Session. Revokes that cookie.</td></tr>
+            <tr><td>GET</td><td><code>/api/me</code></td><td>Session</td></tr>
+            <tr><td>POST</td><td><code>/api/me/password</code></td><td>Session. Body <code>{current, next}</code></td></tr>
+            <tr><td>GET / POST</td><td><code>/api/users</code></td><td>Admin</td></tr>
+            <tr><td>DELETE</td><td><code>/api/users/{id}</code></td><td>Admin</td></tr>
+            <tr><td>POST</td><td><code>/api/users/{id}/password</code></td><td>Admin. Body <code>{next}</code></td></tr>
+            <tr><td>POST</td><td><code>/api/users/{id}/disable</code></td><td>Admin. Body <code>{disabled}</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="edge">
+        <h2>With nginx</h2>
+        <p>
+          Once operator accounts exist, the dashboard uses the session cookie.
+          nginx may still replace <code>Authorization</code> with the ingest Bearer
+          (see <a href="15-production-edge.html">15</a>) — that header is ignored for
+          UI APIs. Keep basic auth if you want two gates. Deny <code>/api/ingest</code>
+          on the public vhost either way.
+        </p>
+        <p>
+          <code>/login</code>, <code>/api/login</code>, and <code>/api/setup</code> stay
+          reachable through the proxy so the first admin can be created and people can sign in.
+        </p>
+      </section>
+
+      <section class="block" id="dont">
+        <h2>Do not</h2>
+        <ul>
+          <li>Reuse the ingest token as an operator password</li>
+          <li>Leave <code>SIEM_ADMIN_PASSWORD</code> in the env file after first boot</li>
+          <li>Grant user-admin to anything that only knows the ingest token</li>
+          <li>Commit usernames, hashes, or session cookies</li>
+          <li>Expose <code>--listen 0.0.0.0</code> with zero users and no firewall</li>
+        </ul>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 18 · back to <a href="../index.html">hub home</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

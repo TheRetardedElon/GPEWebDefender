@@ -46,6 +46,19 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	mux.HandleFunc("GET /api/search", s.search)
+	mux.HandleFunc("GET /api/auth-status", s.authStatus)
+	mux.HandleFunc("GET /api/me", s.me)
+	mux.HandleFunc("POST /api/login", s.login)
+	mux.HandleFunc("POST /api/setup", s.setup)
+	mux.HandleFunc("POST /api/logout", s.logout)
+	mux.HandleFunc("GET /api/users", s.listUsers)
+	mux.HandleFunc("POST /api/users", s.createUser)
+	mux.HandleFunc("DELETE /api/users/{id}", s.deleteUser)
+	mux.HandleFunc("POST /api/users/{id}/password", s.adminSetPassword)
+	mux.HandleFunc("POST /api/users/{id}/disable", s.disableUser)
+	mux.HandleFunc("POST /api/me/password", s.changePassword)
+	mux.HandleFunc("GET /login", s.serveLogin)
+	mux.HandleFunc("GET /login.html", s.serveLogin)
 	if s.DocsDir != "" {
 		mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/docs/", http.StatusFound)
@@ -126,30 +139,7 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func (s *Server) auth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if s.Token == "" || !strings.HasPrefix(r.URL.Path, "/api/") {
-			next.ServeHTTP(w, r)
-			return
-		}
-		// Health stays open so the box can be probed.
-		if r.URL.Path == "/api/health" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		got := r.Header.Get("Authorization")
-		got = strings.TrimPrefix(got, "Bearer ")
-		if got == "" {
-			got = r.URL.Query().Get("token")
-		}
-		if got != s.Token {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
+
 
 func (s *Server) mapFeed(w http.ResponseWriter, r *http.Request) {
 	since := time.Now().Add(-24 * time.Hour)
@@ -242,14 +232,24 @@ func (s *Server) sources(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
-	geoip := s.Pipe.Geo != nil && s.Pipe.Geo.HasMMDB()
+	geoip, rules := false, 0
+	var seen, fired, drop int64
+	if s.Pipe != nil {
+		geoip = s.Pipe.Geo != nil && s.Pipe.Geo.HasMMDB()
+		if s.Pipe.Engine != nil {
+			rules = s.Pipe.Engine.Len()
+		}
+		seen = s.Pipe.Seen.Load()
+		fired = s.Pipe.Fired.Load()
+		drop = s.Pipe.Dropped.Load()
+	}
 	writeJSON(w, map[string]any{
-		"ok":     true,
-		"seen":   s.Pipe.Seen.Load(),
-		"fired":  s.Pipe.Fired.Load(),
-		"drop":   s.Pipe.Dropped.Load(),
-		"rules":  s.Pipe.Engine.Len(),
-		"geoip":  geoip,
+		"ok":    true,
+		"seen":  seen,
+		"fired": fired,
+		"drop":  drop,
+		"rules": rules,
+		"geoip": geoip,
 	})
 }
 
@@ -290,6 +290,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	page, err := s.Store.Search(store.SearchQuery{
 		Q: q.Get("q"), IP: q.Get("ip"), Host: q.Get("host"),
 		Source: q.Get("source"), Kind: q.Get("kind"), Limit: limit,
+		OldestFirst: q.Get("sort") == "oldest",
 	})
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -310,15 +311,27 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 			st.Retain = fmt.Sprintf("%dh", h)
 		}
 	}
+	geoip, rules := false, 0
+	if s.Pipe != nil {
+		geoip = s.Pipe.Geo != nil && s.Pipe.Geo.HasMMDB()
+		if s.Pipe.Engine != nil {
+			rules = s.Pipe.Engine.Len()
+		}
+	}
 	writeJSON(w, map[string]any{
 		"settings":  st,
 		"token_set": s.Token != "",
-		"geoip":     s.Pipe.Geo != nil && s.Pipe.Geo.HasMMDB(),
-		"rules":     s.Pipe.Engine.Len(),
+		"geoip":     geoip,
+		"rules":     rules,
 	})
 }
 
 func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
+	if s.Store.UserCount() > 0 {
+		if _, ok := s.requireAdmin(w, r); !ok {
+			return
+		}
+	}
 	var in event.Settings
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
 		http.Error(w, "bad json", 400)

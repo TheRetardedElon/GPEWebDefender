@@ -7,7 +7,7 @@ Visual hierarchy for the **web-attack monitor**.
 
 Never put real hostnames, IPs, or secrets in these pages.
 
-## Chapters (strict **00 → 16**)
+## Chapters (strict **00 → 18**)
 
 Nav is generated only from `js/nav.js`.
 
@@ -15,10 +15,10 @@ Nav is generated only from `js/nav.js`.
 |-------|--------|
 | **00–02** | What it is, what it is not, architecture |
 | **03–05** | Install, demo vs live, log formats |
-| **06–07** | Detection engine + rule catalog |
+| **06–07** | Detection engine + 41-rule catalog |
 | **08–10** | UI/API, agent, dedicated-box deploy |
 | **11–12** | Limits, roadmap |
-| **13–16** | Attack map, snoop & canaries, production edge, reports & auth |
+| **13–14** | Attack map (color filter), snoop & canaries |
 
 ## Local open
 

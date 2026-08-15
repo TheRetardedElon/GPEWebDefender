@@ -23,6 +23,8 @@
         </select>
       </label>
       <a class="docs-link" href="/docs/">Docs</a>
+      <span class="who" id="whoami" hidden></span>
+      <button type="button" class="btn-quiet" id="logout" hidden>Sign out</button>
       <span class="dot" id="live-dot"></span>
       <span id="live-label">connecting</span>
     </div>
@@ -124,7 +126,11 @@
     </form>
     <div class="search-wrap">
       <table class="rpt" id="search-table">
-        <thead><tr><th>#</th><th>When</th><th>What</th><th>Who</th><th>Where</th><th>Src</th></tr></thead>
+        <thead><tr>
+          <th>#</th>
+          <th><button type="button" class="th-sort" id="search-when" title="Sort by time">When <span id="search-when-dir">▾</span></button></th>
+          <th>What</th><th>Who</th><th>Where</th><th>Src</th>
+        </tr></thead>
         <tbody id="search-body"><tr><td colspan="6" class="empty">Type a keyword, IP, or host.</td></tr></tbody>
       </table>
     </div>
@@ -194,6 +200,59 @@
         <span class="muted" id="settings-status"></span>
       </div>
     </form>
+
+    <section class="set-block" id="acct-block" hidden>
+      <h3>Your account</h3>
+      <p class="field-help">Change the password you use to open this dashboard. At least 12 characters. Other sessions are signed out.</p>
+      <form id="pw-form" class="acct-form">
+        <div class="field">
+          <label for="pw-cur">Current password</label>
+          <input id="pw-cur" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="field">
+          <label for="pw-new">New password</label>
+          <input id="pw-new" type="password" autocomplete="new-password" required minlength="12" />
+        </div>
+        <div class="field">
+          <label for="pw-new2">Confirm new password</label>
+          <input id="pw-new2" type="password" autocomplete="new-password" required minlength="12" />
+        </div>
+        <div class="settings-actions">
+          <button type="submit">Change password</button>
+          <span class="muted" id="pw-status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="set-block" id="users-block" hidden>
+      <h3>Operators</h3>
+      <p class="field-help">Admins can create accounts and reset passwords. The ingest token cannot do this. You cannot delete or disable the last admin.</p>
+      <table class="rpt" id="users-table">
+        <thead><tr><th>User</th><th>Role</th><th>Last login</th><th></th></tr></thead>
+        <tbody id="users-body"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+      </table>
+      <form id="user-form" class="acct-form">
+        <div class="field">
+          <label for="nu-name">New username</label>
+          <input id="nu-name" autocomplete="off" maxlength="32" required />
+        </div>
+        <div class="field">
+          <label for="nu-pass">Password</label>
+          <input id="nu-pass" type="password" autocomplete="new-password" required minlength="12" />
+        </div>
+        <div class="field">
+          <label for="nu-role">Role</label>
+          <select id="nu-role">
+            <option value="viewer">Viewer (dashboard only)</option>
+            <option value="admin">Admin (users + settings)</option>
+          </select>
+        </div>
+        <div class="settings-actions">
+          <button type="submit">Create user</button>
+          <span class="muted" id="user-status"></span>
+        </div>
+      </form>
+    </section>
   </div>
 
   <dialog id="detail">

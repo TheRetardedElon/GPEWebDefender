@@ -13,8 +13,9 @@ Typical path:
 
 1. One monitor box: binary + `rules/` + `dochub/` + manager unit + token file.
 2. Optional: drop `geoip.mmdb` in the manager working directory.
-3. Each host that has HTTP access logs and/or SSH you care about: same binary + agent unit + the **same** token (`--tail` and/or `--journal`).
+3. Each host that has HTTP access logs: same binary + agent unit + the **same** token.
 4. Firewall: ingest port only from those web hosts.
-5. Optional nginx: UI login for humans. Deny `/api/ingest` on the public vhost.
+5. Optional nginx: extra basic auth for humans. Deny `/api/ingest` on the public vhost.
+6. Open `/login` and create the first admin (or set `SIEM_ADMIN_USER` / `SIEM_ADMIN_PASSWORD` once, then remove the password). The ingest token cannot manage users.
 
 Nothing in this folder is an inventory of a real deployment.

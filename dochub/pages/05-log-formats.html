@@ -53,7 +53,7 @@
           </tbody>
         </table>
         <h3>nginx snippet</h3>
-        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>log_format json_gwd escape=json
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>log_format json_siem escape=json
   '{'
     '"remote_addr":"$remote_addr",'
     '"request_method":"$request_method",'
@@ -65,7 +65,7 @@
     '"host":"$host",'
     '"time_iso8601":"$time_iso8601"'
   '}';
-access_log /var/log/nginx/access.json json_gwd;</code></pre>
+access_log /var/log/nginx/access.json json_siem;</code></pre>
         <div class="callout warn">
           <strong>Do not add the body</strong>
           <code>$request_body</code> will eventually log a card number or a password.

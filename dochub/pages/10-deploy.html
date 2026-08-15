@@ -66,8 +66,8 @@ flowchart LR
           </pre>
         </div>
         <p class="diagram-caption">
-          HTTP access logs need <code>--tail</code>. Linux SSH/sudo can use <code>--journal</code> on the same agent.
-          A machine with neither does not need an agent. See <a href="17-configure.html">17</a>.
+          Only machines that write HTTP access logs need an agent.
+          Settlement nodes, build boxes, and databases do not generate web-attack telemetry.
         </p>
       </section>
 
@@ -75,19 +75,19 @@ flowchart LR
         <h2>Manager (monitor box)</h2>
         <ol>
           <li>Copy the Linux binary to <code>/usr/local/bin/gpewebdefender</code>.</li>
-          <li>System user <code>gpewebdefender</code>, home <code>/var/lib/gpewebdefender</code>.</li>
+          <li>System user <code>gpesiem</code>, home <code>/var/lib/gpewebdefender</code>.</li>
           <li>Copy <code>rules/*.yaml</code> to <code>/var/lib/gpewebdefender/rules</code> (cwd of the service).</li>
           <li>Copy this DocHub to <code>/var/lib/gpewebdefender/dochub</code>.</li>
           <li>Put a long random ingest secret in <code>/etc/gpewebdefender/token</code> (mode 640). Load it via an env file — do not paste it into git or this page.</li>
         </ol>
         <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>[Unit]
-Description=gpewebdefender web-attack monitor
+Description=gpesiem web-attack monitor
 After=network.target
 
 [Service]
 Type=simple
-User=gpewebdefender
-Group=gpewebdefender
+User=gpesiem
+Group=gpesiem
 WorkingDirectory=/var/lib/gpewebdefender
 EnvironmentFile=/etc/gpewebdefender/env
 ExecStart=/usr/local/bin/gpewebdefender serve \
@@ -119,7 +119,6 @@ WantedBy=multi-user.target</code></pre>
   --url http://MONITOR_INTERNAL:8787 \
   --token "$(cat /etc/gpewebdefender/token)" \
   --tail /var/log/nginx/access.log \
-  --journal \
   --name web-1</code></pre>
         <p>
           Prefer a private NIC, VPN, or SSH tunnel over exposing ingest.

@@ -125,13 +125,18 @@ func TestSearchFTS(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	must(st.InsertEvent(event.Event{ID: "e1", Time: now, SrcIP: "203.0.113.9", User: "alice", Path: "/owner/login", Kind: "tenantlogin", Source: "platform", URL: "/owner/login"}))
+	must(st.InsertEvent(event.Event{ID: "e1", Time: now.Add(-time.Hour), SrcIP: "203.0.113.9", User: "alice", Path: "/owner/login", Kind: "tenantlogin", Source: "platform", URL: "/owner/login"}))
+	must(st.InsertEvent(event.Event{ID: "e2", Time: now, SrcIP: "203.0.113.9", User: "alice", Path: "/owner/login", Kind: "tenantlogin", Source: "platform", URL: "/owner/login"}))
 	page, err := st.Search(SearchQuery{Q: "alice", Limit: 10})
-	if err != nil || len(page.Hits) != 1 || page.Hits[0].User != "alice" {
-		t.Fatalf("fts user: %+v %v", page, err)
+	if err != nil || len(page.Hits) != 2 || page.Hits[0].Ref != "e2" {
+		t.Fatalf("newest first: %+v %v", page, err)
+	}
+	page, err = st.Search(SearchQuery{Q: "alice", Limit: 10, OldestFirst: true})
+	if err != nil || len(page.Hits) != 2 || page.Hits[0].Ref != "e1" {
+		t.Fatalf("oldest first: %+v %v", page, err)
 	}
 	page, err = st.Search(SearchQuery{IP: "203.0.113.9", Limit: 10})
-	if err != nil || len(page.Hits) != 1 {
+	if err != nil || len(page.Hits) != 2 {
 		t.Fatalf("ip: %+v %v", page, err)
 	}
 }
