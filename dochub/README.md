@@ -2,14 +2,14 @@
 
 Visual hierarchy for the **web-attack monitor**.
 
-- **Binary:** `gpesiem` — Go, Windows + Linux, no JVM
+- **Binary:** `gpewebdefender` — Go, Windows + Linux, no JVM
 - **On a live manager:** http://127.0.0.1:8787/docs/ (when `./dochub` exists in the working directory)
 
 Never put real hostnames, IPs, or secrets in these pages.
 
 **New here?** Open [pages/03-install-and-run.html](pages/03-install-and-run.html). Method A is the install script. Method B is every command typed out.
 
-## Chapters (00 → 19)
+## Chapters (00 → 21)
 
 Nav is generated only from `js/nav.js`.
 
@@ -20,7 +20,7 @@ Nav is generated only from `js/nav.js`.
 | **06–07** | Detection engine + rule catalog |
 | **08–10** | UI/API, agent, dedicated-box deploy |
 | **11–15** | Limits, roadmap, map, canaries, production edge |
-| **16–19** | Insight / reports, configure map, operator accounts, hook your app |
+| **16–21** | Insight / reports, configure map, operator accounts, hook your app, pair & block, on-demand host status |
 
 ## Local open
 

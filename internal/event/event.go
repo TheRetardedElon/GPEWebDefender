@@ -186,6 +186,12 @@ type Alert struct {
 	Lon       float64   `json:"lon,omitempty"`
 	HasGeo    bool      `json:"has_geo,omitempty"`
 	Tags      []string  `json:"tags,omitempty"`
+	Kind      string    `json:"kind,omitempty"`
+	User      string    `json:"user,omitempty"`
+	Outcome   string    `json:"outcome,omitempty"`
+	Path      string    `json:"path,omitempty"`
+	Host      string    `json:"host,omitempty"`
+	Reason    string    `json:"reason,omitempty"`
 }
 
 // Stats is a snapshot for the dashboard.
@@ -212,6 +218,37 @@ type Attacker struct {
 	MaxSev     string    `json:"max_severity"`
 	Categories []string  `json:"categories"`
 	Country    string    `json:"country,omitempty"`
+}
+
+// IPIntel is our telemetry on one source IP, plus a local weight.
+// It is not a third-party reputation verdict.
+type IPIntel struct {
+	SrcIP       string      `json:"src_ip"`
+	Since       time.Time   `json:"since"`
+	Until       time.Time   `json:"until"`
+	Private     bool        `json:"private,omitempty"`
+	Alerts      int64       `json:"alerts"`
+	Critical    int64       `json:"critical"`
+	High        int64       `json:"high"`
+	Canary      int64       `json:"canary"`
+	Hosts       []string    `json:"hosts"`
+	Categories  []string    `json:"categories"`
+	FirstSeen   time.Time   `json:"first_seen,omitempty"`
+	LastSeen    time.Time   `json:"last_seen,omitempty"`
+	Country     string      `json:"country,omitempty"`
+	CountryName string      `json:"country_name,omitempty"`
+	ByRule      []RuleCount `json:"by_rule"`
+	Users       []NameCount `json:"users,omitempty"`
+	Weight      int         `json:"weight"`
+	Verdict     string      `json:"verdict"`
+	Intent      string      `json:"intent"`
+	Why         []string    `json:"why"`
+	Queued      bool        `json:"queued,omitempty"`
+	Research    string      `json:"research,omitempty"` // off | queued | cached | trickle
+	ExtScore    int         `json:"ext_score,omitempty"`
+	ExtSource   string      `json:"ext_source,omitempty"`
+	ExtCachedAt time.Time   `json:"ext_cached_at,omitempty"`
+	ExtNote     string      `json:"ext_note,omitempty"`
 }
 
 // MapFeed is the live attack-map payload.

@@ -33,6 +33,7 @@
   <nav class="tabs" id="view-tabs" aria-label="Views">
     <button type="button" data-view="live" class="on">Live</button>
     <button type="button" data-view="reports">Reports</button>
+    <button type="button" data-view="status">Status</button>
     <button type="button" data-view="search">Search</button>
     <button type="button" data-view="settings">Settings</button>
   </nav>
@@ -107,6 +108,20 @@
   </main>
   </div>
 
+  <div id="view-status" hidden>
+    <div class="settings-col status-page">
+      <header class="settings-intro">
+        <h2>Server status</h2>
+        <p>On demand only — nothing is polled in the background. Click <strong>Check</strong> when you want a snapshot (CPU load, memory, disk). Paired sensors answer on their next command poll (a few seconds). The manager can check itself immediately.</p>
+        <div class="settings-actions">
+          <button type="button" class="btn-quiet" id="status-check-all">Check all paired hosts</button>
+          <span class="muted" id="status-note"></span>
+        </div>
+      </header>
+      <div id="status-grid" class="status-grid"></div>
+    </div>
+  </div>
+
   <div id="view-reports" hidden>
     <div class="report-bar">
       <div class="filters" id="report-views">
@@ -116,6 +131,7 @@
         <button type="button" data-report="app">Auth · App</button>
         <button type="button" data-report="tenant">Auth · Tenants</button>
         <button type="button" data-report="probes">Probes</button>
+        <button type="button" data-report="blocks">Blocklist</button>
       </div>
       <div class="report-tools">
         <span class="muted" id="report-window"></span>
@@ -164,11 +180,45 @@
   </div>
 
   <div id="view-settings" hidden>
+    <div class="settings-col">
+    <header class="settings-intro">
+      <h2>Settings</h2>
+      <p>How this dashboard looks, who can open it, and which sensors may take <strong>Block</strong> orders. The ingest token and listen address stay in the server env file.</p>
+      <p class="jump-settings"><a href="#pair-block">Paired hosts</a> · <a href="#acct-block">Your account</a> · <a href="#users-block">Operators</a></p>
+    </header>
+
+    <section class="set-block" id="pair-block">
+      <h3>Paired hosts — block from the dashboard</h3>
+      <p class="field-help">
+        This is the control plane. Invent a phrase, mint a one-time code, run
+        <code>gpewebdefender pair</code> on that box, then <strong>Approve</strong> here.
+        After that, the inspect card on Live grows <strong>Block on this host</strong> for that name.
+        Viewers cannot do any of this. Live / Reports stay watch-only on purpose.
+      </p>
+      <div id="pair-phrase-wrap">
+        <form id="pair-phrase-form" class="acct-form">
+          <div class="field">
+            <label for="pair-phrase">Enrollment phrase (min 12 — you invent this)</label>
+            <input id="pair-phrase" type="password" autocomplete="new-password" minlength="12" placeholder="type a phrase only you know" />
+          </div>
+          <div class="settings-actions">
+            <button type="submit" id="pair-phrase-save">Save phrase</button>
+            <span class="muted" id="pair-phrase-status"></span>
+          </div>
+        </form>
+      </div>
+      <div class="settings-actions" style="margin: 10px 0;">
+        <button type="button" class="btn-quiet" id="pair-mint">Pair a host…</button>
+        <span class="muted" id="pair-mint-status"></span>
+      </div>
+      <table class="rpt" id="agents-table">
+        <thead><tr><th>Host</th><th>Status</th><th>Seen</th><th>Block</th><th></th></tr></thead>
+        <tbody id="agents-body"><tr><td colspan="5" class="empty">No paired hosts yet. Save a phrase, mint a code, run pair on the box, then Approve.</td></tr></tbody>
+      </table>
+      <p class="field-help" id="pair-code-box" hidden></p>
+    </section>
+
     <form class="settings" id="settings-form">
-      <header class="settings-intro">
-        <h2>Settings</h2>
-        <p>How this dashboard looks and how long it keeps logs. The ingest token and listen address stay in the server env file.</p>
-      </header>
 
       <section class="set-block">
         <h3>This dashboard</h3>
@@ -305,6 +355,7 @@
         </form>
       </div>
     </section>
+    </div>
   </div>
 
   <dialog id="detail">

@@ -19,7 +19,7 @@
           API in <code>internal/server</code>. Live feed is SSE, not WebSocket.
         </p>
         <div class="meta-row">
-          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill live">Reviewed 2026-08-16</span>
           <span class="pill">Default :8787</span>
         </div>
       </header>
@@ -29,7 +29,7 @@
         <table>
           <thead><tr><th>Surface</th><th>Does</th></tr></thead>
           <tbody>
-            <tr><td>Live / Reports / Search / Settings</td><td>Live is the map + numbered feed. Reports: vectors + auth. Search is FTS5. Settings is display, map pins, retention, and operator accounts. Not the ingest token or log paths. See <a href="17-configure.html">17</a> and <a href="18-operator-accounts.html">18</a>.</td></tr>
+            <tr><td>Live / Reports / Status / Search / Settings</td><td>Live is the map + numbered feed. Reports: vectors + auth + blocklist. Status is on-demand load / memory / disk (ch. <a href="21-host-status.html">21</a>). Search is FTS5. Settings is display, map pins, retention, operators, and paired hosts. Not the ingest token or log paths. See <a href="17-configure.html">17</a>, <a href="18-operator-accounts.html">18</a>, <a href="20-pair-and-block.html">20</a>.</td></tr>
             <tr><td>Host dropdown</td><td><strong>All hosts</strong> (fleet map + stats) or one agent <code>--name</code>. Remembered in the browser.</td></tr>
             <tr><td>Stat cards</td><td>Events/1h, alerts/1h, critical/1h, unique attacker IPs/1h, rules loaded. Follow the host filter.</td></tr>
             <tr><td>Live alerts</td><td>Filter by host + severity + search (IP, path, rule). Click a row for detail.</td></tr>
@@ -57,7 +57,12 @@
             <tr><td>GET</td><td><code>/api/reports/vectors</code></td><td>token if set</td><td><code>since</code>, <code>source</code>. Category, severity, host, MITRE, path, country, adaptive time buckets, top IPs.</td></tr>
             <tr><td>GET</td><td><code>/api/export/alerts</code></td><td>session (or token if no users)</td><td>Same window as Insight. <code>format=csv|json</code>, <code>since</code>, <code>source</code>. Max 5000 rows. Attachment, <code>Cache-Control: no-store</code>. Does not include the ingest token or operator accounts.</td></tr>
             <tr><td>GET</td><td><code>/api/export/events</code></td><td>session (or token if no users)</td><td>Auth / probe channel rows. <code>channel=web|linux|app|tenant|probes</code>, same format flags.</td></tr>
+            <tr><td>GET</td><td><code>/api/intel</code></td><td>session (or token if no users)</td><td><code>ip</code>, <code>since</code>. Local threat weight + intent from <em>our</em> alerts. Optional slow AbuseIPDB trickle if <code>ABUSEIPDB_KEY</code> is set (~90s, cached). Browser links for the other sites. No HTML scraping.</td></tr>
             <tr><td>GET</td><td><code>/api/reports/auth</code></td><td>token if set</td><td><code>channel=web|linux|app</code>, <code>since</code>, <code>source</code>.</td></tr>
+            <tr><td>GET</td><td><code>/api/reports/blocks</code></td><td>session</td><td>Current blocklist: IP, host, why (alert title/number), applied/failed/queued, time left, hits after ban.</td></tr>
+            <tr><td>GET</td><td><code>/api/status</code></td><td>session</td><td>Last host snapshots. No live scrape. See <a href="21-host-status.html">21</a>.</td></tr>
+            <tr><td>POST</td><td><code>/api/status/check</code>, <code>/api/agents/{id}/check</code>, <code>/api/agents/check-all</code></td><td>admin session</td><td>Request one snapshot. Manager answers immediately. Paired sensors answer on the next command poll.</td></tr>
+            <tr><td>POST</td><td><code>/api/agent/stats</code></td><td>that host’s pair key</td><td>Sensor posts the snapshot. Ingest token cannot.</td></tr>
             <tr><td>GET</td><td><code>/api/stats</code></td><td>token if set</td><td>Dashboard snapshot. Query: <code>source</code></td></tr>
             <tr><td>GET</td><td><code>/api/alerts</code></td><td>token if set</td><td>Paged. Query: <code>q</code> (also <code>#123</code>), <code>severity</code>, <code>ip</code>, <code>source</code>, <code>since</code>, <code>limit</code>, <code>before</code>/<code>after</code> (alert number). Body: <code>{alerts,has_more,oldest_num,newest_num}</code></td></tr>
             <tr><td>GET/PUT</td><td><code>/api/settings</code></td><td>session (admin to PUT)</td><td>Site name, <code>home</code>, <code>homes</code>, <code>retain</code>, <code>timezone</code>. Token and listen stay in flags/env.</td></tr>
@@ -67,7 +72,10 @@
             <tr><td>GET</td><td><code>/api/attackers</code></td><td>token if set</td><td><code>since</code>, <code>limit</code>, <code>source</code></td></tr>
             <tr><td>GET</td><td><code>/api/rules</code></td><td>token if set</td><td>Loaded rule metadata (no regex text)</td></tr>
             <tr><td>GET</td><td><code>/api/stream</code></td><td>token if set</td><td>SSE. Events: <code>ping</code>, <code>alert</code></td></tr>
-            <tr><td>POST</td><td><code>/api/ingest</code></td><td>token if set</td><td>Plain lines, JSON string array, one Event, or Event batch. Header <code>X-SIEM-Source</code>.</td></tr>
+            <tr><td>POST</td><td><code>/api/ingest</code></td><td>token if set</td><td>Plain lines, JSON string array, one Event, or Event batch. Header <code>X-SIEM-Source</code>. A paired host key also works after Approve (name is forced).</td></tr>
+            <tr><td>POST</td><td><code>/api/agent/pair</code></td><td>open, rate-limited</td><td>Phrase + one-time code + host name. See <a href="20-pair-and-block.html">20</a>.</td></tr>
+            <tr><td>GET</td><td><code>/api/agent/commands</code></td><td>that host’s key</td><td>Only after Approve. <code>ban</code> / <code>unban</code> / <code>list</code> / <code>stats</code>.</td></tr>
+            <tr><td>POST</td><td><code>/api/pair-phrase</code>, <code>/api/pair-codes</code>, <code>/api/agents/…</code></td><td>admin session</td><td>Mint codes, approve, revoke, ban. Viewer cannot. Ingest token cannot.</td></tr>
           </tbody>
         </table>
         <p class="hint">

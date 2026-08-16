@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 450" width="400" height="450">
+  <defs>
+    <!-- The neon cyber glow filter -->
+    <filter id="inPreciseStaticGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    
+    <!-- The dot-grid pattern to match your GoPastEarth map aesthetic -->
+    <pattern id="inPreciseStaticGrid" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.5" fill="#00ff66" opacity="0.4" />
+    </pattern>
+  </defs>
+
+  <g filter="url(#inPreciseStaticGlow)">
+    <!-- India Mainland Subcontinent -->
+    <path d="M 180,40 L 210,50 L 240,65 L 265,80 L 285,110 L 270,140 L 255,160 L 245,190 L 260,220 L 270,250 L 260,280 L 240,310 L 220,340 L 200,380 L 190,410 L 175,380 L 160,340 L 140,310 L 120,280 L 105,250 L 90,220 L 70,200 L 85,175 L 110,180 L 130,165 L 115,140 L 90,135 L 75,110 L 95,95 L 115,100 L 135,80 L 155,75 L 165,55 Z" 
+          fill="url(#inPreciseStaticGrid)" 
+          stroke="#00ff66" 
+          stroke-width="1.2" 
+          stroke-linejoin="round" />
+  </g>
+</svg>

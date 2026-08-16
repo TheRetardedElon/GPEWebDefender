@@ -119,20 +119,44 @@ rules:
 
   # --- Sensitive path / recon ---------------------------------------------
   - id: web.recon.env
-    title: Secret file probe (.env / credentials)
+    title: Secret file probe (.env / config / keys)
     severity: high
     category: recon
     mitre: [T1595.003]
-    fields: [decoded]
-    pattern: '(?i)(/\.env(?:\.|$)|/\.env\.(local|prod|production|staging|dev)|/\.aws/credentials|/appsettings\.[^/]*json|/id_rsa|/id_ed25519|\.htpasswd)'
+    skip_loopback: true
+    fields: [decoded, path]
+    pattern: '(?i)(/\.env(?:\.[a-z0-9_.-]+)?(?:/|$|\?)|/\.aws/credentials|/appsettings\.[^/]*json|/(?:id_rsa|id_ed25519|id_ecdsa)(?:\.pub)?(?:/|$|\?)|\.htpasswd|/wp-config\.php|/config\.php|/configuration\.php|/local\.xml|/settings\.py|/secrets?\.(ya?ml|json|env)|/credentials\.(json|xml|yml)|/web\.config|/application(-[a-z]+)?\.(ya?ml|properties)|/\.npmrc|/\.yarnrc|/\.netrc|/\.pgpass|/\.my\.cnf|/php\.ini|/database\.ya?ml|/\.terraform|/[^/]+\.tfvars|/serviceAccount\.json|/firebase[^/]*\.json|/\.ssh/(authorized_keys|id_[a-z0-9]+)|/\.bash_history|/\.mysql_history|/\.docker/config\.json)'
+
+  - id: web.secret.served
+    title: Secret file was served (.env / config / keys)
+    severity: critical
+    category: canary
+    mitre: [T1552.001]
+    tags: [secret, leak]
+    skip_loopback: true
+    status: [200, 206]
+    fields: [decoded, path]
+    pattern: '(?i)(/\.env(?:\.[a-z0-9_.-]+)?(?:/|$|\?)|/\.aws/credentials|/appsettings\.[^/]*json|/(?:id_rsa|id_ed25519|id_ecdsa)(?:\.pub)?(?:/|$|\?)|\.htpasswd|/wp-config\.php|/config\.php|/configuration\.php|/local\.xml|/settings\.py|/secrets?\.(ya?ml|json|env)|/credentials\.(json|xml|yml)|/web\.config|/application(-[a-z]+)?\.(ya?ml|properties)|/\.npmrc|/\.yarnrc|/\.netrc|/\.pgpass|/\.my\.cnf|/php\.ini|/database\.ya?ml|/\.terraform|/[^/]+\.tfvars|/serviceAccount\.json|/firebase[^/]*\.json|/\.ssh/(authorized_keys|id_[a-z0-9]+)|/\.bash_history|/\.mysql_history|/\.docker/config\.json)'
 
   - id: web.recon.git
     title: Source-control probe (.git / .svn)
     severity: high
     category: recon
     mitre: [T1595.003]
+    skip_loopback: true
     fields: [path]
     pattern: '(?i)(/\.(git|svn|hg)(/|$)|/\.git/HEAD|/\.git/config)'
+
+  - id: web.secret.git_served
+    title: Source-control files were served (.git)
+    severity: critical
+    category: canary
+    mitre: [T1552.001]
+    tags: [secret, leak]
+    skip_loopback: true
+    status: [200, 206]
+    fields: [path]
+    pattern: '(?i)(/\.(git|svn|hg)(/|$)|/\.git/HEAD|/\.git/config|/\.git/index)'
 
   - id: web.recon.backup
     title: Backup / dump file probe

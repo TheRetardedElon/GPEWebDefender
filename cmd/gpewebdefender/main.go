@@ -16,10 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	"gpewebdefender/internal/block"
 	"gpewebdefender/internal/detect"
 	"gpewebdefender/internal/demo"
 	"gpewebdefender/internal/geo"
 	"gpewebdefender/internal/hub"
+	"gpewebdefender/internal/intel"
 	"gpewebdefender/internal/pipeline"
 	"gpewebdefender/internal/server"
 	"gpewebdefender/internal/store"
@@ -27,7 +29,7 @@ import (
 	"gpewebdefender/rules"
 )
 
-const version = "0.9.14"
+const version = "0.9.25"
 
 func main() {
 	log.SetFlags(0)
@@ -43,6 +45,8 @@ func main() {
 		demoCmd(os.Args[2:])
 	case "agent":
 		agentCmd(os.Args[2:])
+	case "pair":
+		pairCmd(os.Args[2:])
 	case "version", "-v", "--version":
 		fmt.Println("gpewebdefender", version)
 	case "help", "-h", "--help":
@@ -60,12 +64,14 @@ func usage() {
   gpewebdefender serve   start the monitor (tail logs + UI)
   gpewebdefender demo    run a live simulated attack feed
   gpewebdefender agent   ship access logs from another host
+  gpewebdefender pair    register this host with a one-time code
   gpewebdefender version
 
 Examples
   gpewebdefender serve --tail C:\logs\access.log --listen :8787
   gpewebdefender serve --tail /var/log/nginx/access.log
   gpewebdefender demo
+  gpewebdefender pair --url http://siem:8787 --name web-1 --code ABCD-2341 --block fail2ban
   gpewebdefender agent --url http://siem:8787 --token SECRET --tail /var/log/nginx/access.log
 `, version)
 }
@@ -98,6 +104,7 @@ func serveCmd(args []string) {
 	bootstrapAdmin(pipe.Store)
 
 	go pruneLoop(ctx, pipe.Store)
+	go intel.Run(ctx, pipe.Store)
 
 	for _, p := range splitCSV(*tailPath) {
 		p := p
@@ -124,7 +131,7 @@ func serveCmd(args []string) {
 	}
 
 	docs := resolveDocs(*docsDir)
-	srv := &server.Server{Pipe: pipe, Store: pipe.Store, Hub: pipe.Hub, Token: *token, DocsDir: docs}
+	srv := &server.Server{Pipe: pipe, Store: pipe.Store, Hub: pipe.Hub, Token: *token, DocsDir: docs, Version: version}
 	httpSrv := &http.Server{Addr: *listen, Handler: srv.Handler()}
 	go func() {
 		if docs != "" {
@@ -169,7 +176,7 @@ func demoCmd(args []string) {
 		pipe.IngestLine(line, "demo")
 	})
 
-	srv := &server.Server{Pipe: pipe, Store: pipe.Store, Hub: pipe.Hub, DocsDir: resolveDocs("")}
+	srv := &server.Server{Pipe: pipe, Store: pipe.Store, Hub: pipe.Hub, DocsDir: resolveDocs(""), Version: version}
 	httpSrv := &http.Server{Addr: *listen, Handler: srv.Handler()}
 	go func() {
 		log.Printf("DEMO mode — simulated web attacks on http://%s", *listen)
@@ -191,9 +198,32 @@ func agentCmd(args []string) {
 	journal := fs.Bool("journal", false, "follow systemd journal for sshd/sudo/login")
 	fromStart := fs.Bool("from-start", false, "ship existing lines too")
 	name := fs.String("name", hostname(), "source name")
+	credPath := fs.String("cred", defaultCredPath(), "paired host key file")
+	blockFlag := fs.String("block", "", "override block backend on this host (fail2ban|ufw|windows|off)")
+	jail := fs.String("jail", "", "fail2ban jail name")
 	_ = fs.Parse(args)
 	if *url == "" || (*tailPath == "" && !*journal) {
 		log.Fatal("agent requires --url and --tail and/or --journal")
+	}
+	var cred agentCred
+	if c, err := loadCred(*credPath); err == nil && c.Secret != "" {
+		cred = c
+		if cred.URL == "" {
+			cred.URL = strings.TrimRight(*url, "/")
+		}
+		if *name == hostname() && cred.Name != "" {
+			*name = cred.Name
+		}
+		if *blockFlag != "" {
+			cred.Block = *blockFlag
+		}
+		if *jail != "" {
+			cred.Jail = *jail
+		}
+		if cred.Block == "" {
+			cred.Block = block.DetectBackend()
+		}
+		log.Printf("paired host key %s (%s)", *credPath, cred.Name)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -244,8 +274,12 @@ func agentCmd(args []string) {
 		}
 		req.Header.Set("Content-Type", "text/plain")
 		req.Header.Set("X-SIEM-Source", *name)
-		if *token != "" {
+		if cred.Secret != "" && cred.Status == store.AgentActive {
+			req.Header.Set("Authorization", "Bearer "+cred.Secret)
+		} else if *token != "" {
 			req.Header.Set("Authorization", "Bearer "+*token)
+		} else if cred.Secret != "" {
+			req.Header.Set("Authorization", "Bearer "+cred.Secret)
 		}
 		res, err := client.Do(req)
 		if err != nil {
@@ -259,6 +293,10 @@ func agentCmd(args []string) {
 			return
 		}
 		batch = batch[:0]
+	}
+
+	if cred.Secret != "" {
+		go pollCommands(ctx, &cred, *credPath)
 	}
 
 	tick := time.NewTicker(500 * time.Millisecond)

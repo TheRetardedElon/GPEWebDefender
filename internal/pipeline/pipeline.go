@@ -9,6 +9,7 @@ import (
 	"gpewebdefender/internal/event"
 	"gpewebdefender/internal/geo"
 	"gpewebdefender/internal/hub"
+	"gpewebdefender/internal/intel"
 	"gpewebdefender/internal/parse"
 	"gpewebdefender/internal/store"
 )
@@ -99,6 +100,7 @@ func (p *Pipeline) IngestEvent(ev event.Event) {
 		p.enrich(&al)
 		p.Fired.Add(1)
 		_ = p.Store.InsertAlert(&al)
+		intel.MaybeQueue(p.Store, al)
 		if p.Hub != nil {
 			p.Hub.Publish(al)
 		}

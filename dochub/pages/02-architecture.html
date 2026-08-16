@@ -41,7 +41,7 @@
             <tr>
               <td><code>gpewebdefender serve</code></td>
               <td>Manager: optional tail + UI + API + detection</td>
-              <td><code>cmd/gpesiem/main.go</code> → <code>serveCmd</code></td>
+              <td><code>cmd/gpewebdefender/main.go</code> → <code>serveCmd</code></td>
             </tr>
             <tr>
               <td><code>gpewebdefender demo</code></td>
@@ -50,8 +50,13 @@
             </tr>
             <tr>
               <td><code>gpewebdefender agent</code></td>
-              <td>Tail files, POST batches to <code>/api/ingest</code></td>
+              <td>Tail files, POST batches to <code>/api/ingest</code>. After pair + Approve, also pulls block orders and on-demand status checks.</td>
               <td><code>agentCmd</code></td>
+            </tr>
+            <tr>
+              <td><code>gpewebdefender pair</code></td>
+              <td>Register this host with a one-time code + enrollment phrase</td>
+              <td><code>pairCmd</code> · ch. <a href="20-pair-and-block.html">20</a></td>
             </tr>
           </tbody>
         </table>
@@ -101,16 +106,17 @@ flowchart TB
       <section class="block" id="tree">
         <h2>Repo tree</h2>
         <div class="tree">
-          <div class="tree-node root">gpesiem <span class="path">module gpewebdefender</span></div>
+          <div class="tree-node root">gpewebdefender <span class="path">module gpewebdefender</span></div>
           <div class="tree-children">
-            <div class="tree-node"><span class="name">cmd/gpesiem</span><span class="path">main.go</span><span class="desc">CLI: serve · demo · agent · version</span></div>
+            <div class="tree-node"><span class="name">cmd/gpewebdefender</span><span class="path">main.go · pair.go</span><span class="desc">CLI: serve · demo · agent · pair · version</span></div>
             <div class="tree-node"><span class="name">internal/parse</span><span class="desc">Combined + JSON → Event. Double URL-decode.</span></div>
             <div class="tree-node"><span class="name">internal/detect</span><span class="desc">YAML rules, pattern + threshold windows.</span></div>
-            <div class="tree-node"><span class="name">internal/store</span><span class="desc">SQLite events/alerts, prune, stats.</span></div>
+            <div class="tree-node"><span class="name">internal/store</span><span class="desc">SQLite events/alerts, users, pair/agents, prune, stats.</span></div>
+            <div class="tree-node"><span class="name">internal/block</span><span class="desc">Public-IP rails + fail2ban / UFW / Windows apply.</span></div>
             <div class="tree-node"><span class="name">internal/pipeline</span><span class="desc">IngestLine / IngestEvent glue.</span></div>
             <div class="tree-node"><span class="name">internal/tail</span><span class="desc">Poll follow + rotation (size shrink → rewind).</span></div>
             <div class="tree-node"><span class="name">internal/hub</span><span class="desc">SSE fan-out to browsers.</span></div>
-            <div class="tree-node"><span class="name">internal/server</span><span class="desc">HTTP API + embedded UI. Token on /api/*.</span></div>
+            <div class="tree-node"><span class="name">internal/server</span><span class="desc">HTTP API + embedded UI. Ingest token, sessions, pair/commands.</span></div>
             <div class="tree-node"><span class="name">internal/demo</span><span class="desc">Invented attack lines. Not a network client.</span></div>
             <div class="tree-node"><span class="name">rules/</span><span class="desc">web.yaml + embed fallback.</span></div>
             <div class="tree-node"><span class="name">ui/</span><span class="desc">index.html · app.css · app.js embed.</span></div>

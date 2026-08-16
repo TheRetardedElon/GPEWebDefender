@@ -43,7 +43,7 @@
             <tr>
               <td><strong>A WAF</strong></td>
               <td>It talks about SQLi and XSS.</td>
-              <td>It does not sit in the request path. It cannot block. It pages you after the log line exists.</td>
+              <td>It does not sit in the request path. Optional containment (ch. 20) tells that host’s firewall to drop an IP after an admin clicks. Not a proxy, not automatic.</td>
             </tr>
             <tr>
               <td><strong>A full SIEM</strong></td>
@@ -53,7 +53,7 @@
             <tr>
               <td><strong>CrowdSec / fail2ban</strong></td>
               <td>It notices brute force.</td>
-              <td>No bouncer. No iptables. Export a blocklist later maybe — not today.</td>
+              <td>It is not a bouncer. After you pair a sensor (ch. 20), an admin can ask that host’s fail2ban / UFW / Windows Firewall to drop one public IP. No auto-ban from a rule.</td>
             </tr>
             <tr>
               <td><strong>Grafana / Kibana</strong></td>

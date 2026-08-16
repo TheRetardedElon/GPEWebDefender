@@ -88,7 +88,8 @@ flowchart LR
           <tbody>
             <tr><td>Operator account</td><td>Humans</td><td>Argon2id in the manager SQLite. Create / rotate in Settings. <a href="18-operator-accounts.html">18</a>.</td></tr>
             <tr><td>UI basic auth (optional)</td><td>Humans</td><td>nginx htpasswd. A <em>different</em> password from Settings users. Turn it off after operator accounts exist or you will get a browser popup that rejects those users.</td></tr>
-            <tr><td>Ingest token</td><td>Manager + agents</td><td><code>/etc/gpewebdefender/token</code> and <code>/etc/gpewebdefender/env</code> (mode 640). Never grants user-admin.</td></tr>
+            <tr><td>Ingest token</td><td>Manager + agents</td><td><code>/etc/gpewebdefender/token</code> and <code>/etc/gpewebdefender/env</code> (mode 640). Never grants user-admin. Never grants pair / ban.</td></tr>
+            <tr><td>Enrollment phrase + pair code</td><td>Admin + the person at the host</td><td>Phrase is Argon2id in Settings. Code is 15 minutes, one use. After Approve, that host’s key is <code>/etc/gpewebdefender/agent.json</code>. <a href="20-pair-and-block.html">20</a>.</td></tr>
           </tbody>
         </table>
       </section>
@@ -112,8 +113,9 @@ flowchart LR
           Linux boxes you also want SSH/sudo on: add <code>--journal</code>.
           A machine with neither does not need an agent.
           Adding a box is a short checklist in <a href="17-configure.html">17</a>.
+          Pairing for block orders is optional and is <a href="20-pair-and-block.html">20</a>.
         </p>
-        <p class="hint"><code>deploy/gpewebdefender-agent.service.example</code> — copy, fill, enable.</p>
+        <p class="hint"><code>deploy/gpewebdefender-agent.service.example</code> — copy, fill, enable. Keep <code>--cred</code> if you pair.</p>
       </section>
 
       <section class="block" id="geo">

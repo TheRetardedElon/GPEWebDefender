@@ -78,6 +78,16 @@
               <td>Settings will not show or edit the token. That is intentional.</td>
             </tr>
             <tr>
+              <td>Let this host take block orders from the dashboard</td>
+              <td>Settings → Paired hosts: phrase, mint a code, <code>gpewebdefender pair</code> on the box, Approve. <a href="20-pair-and-block.html">20</a>.</td>
+              <td>Not the ingest token. Not a viewer. Not automatic from a rule.</td>
+            </tr>
+            <tr>
+              <td>See load / memory / disk on a box right now</td>
+              <td>Status → Check now (or Check all). Pair that host first if it is not the manager. <a href="21-host-status.html">21</a>.</td>
+              <td>Not a 10-second scrape. Not FIM. Viewer can look, only admin can Check.</td>
+            </tr>
+            <tr>
               <td>Tell the monitor about failed logins / IDOR / canaries the access log cannot see</td>
               <td>App POSTs JSON to <code>/api/ingest</code>. Fire-and-forget. Chapter <a href="19-hook-your-app.html">19</a>.</td>
               <td>Not a new webhook product. Same token as the agent. Never send passwords.</td>
@@ -106,6 +116,11 @@
               <td>Install without thinking about systemd</td>
               <td><code>deploy/install-manager.sh</code> and <code>deploy/install-agent.sh</code>. Chapter <a href="03-install-and-run.html">03</a>.</td>
               <td>Not PM2. systemd already supervises the binary.</td>
+            </tr>
+            <tr>
+              <td>Decide if an IP is “bad”</td>
+              <td>Click the IP (alert card or Attackers). You get <em>our</em> weight + intent, then links to AbuseIPDB, GreyNoise, VirusTotal, Talos, IPOK, IPQS, and the rest. Optional: set <code>ABUSEIPDB_KEY</code> and we trickle one API check ~every 90s, cached. We never scrape the HTML pages.</td>
+              <td>No single site is proof. Scanner noise is not a targeted actor. Do not put a key in git.</td>
             </tr>
           </tbody>
         </table>
@@ -138,6 +153,8 @@
           <li>On the manager, allow that box’s <strong>IP</strong> to the ingest port.</li>
           <li>Open the UI. The name should appear in <strong>Hosts</strong> after the first line arrives.</li>
           <li>Optional: Settings → add a row with that same name and a map location.</li>
+          <li>Optional block from the portal: Settings → Paired hosts → phrase (once) → mint a code → on this box <code>gpewebdefender pair --url … --name SAME-NAME --code … --block fail2ban</code> → Approve the fingerprint. Details: <a href="20-pair-and-block.html">20</a>.</li>
+          <li>Optional Status: after Approve, Status → Check now on that name. Same pairing. <a href="21-host-status.html">21</a>.</li>
         </ol>
         <div class="callout info">
           <strong>No HTTP logs?</strong>

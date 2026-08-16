@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -17,6 +18,7 @@ import (
 	"gpewebdefender/internal/event"
 	"gpewebdefender/internal/geo"
 	"gpewebdefender/internal/hub"
+	"gpewebdefender/internal/intel"
 	"gpewebdefender/internal/pipeline"
 	"gpewebdefender/internal/store"
 	"gpewebdefender/ui"
@@ -28,6 +30,7 @@ type Server struct {
 	Hub     *hub.Hub
 	Token   string
 	DocsDir string
+	Version string
 }
 
 func (s *Server) Handler() http.Handler {
@@ -46,6 +49,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/reports/auth", s.reportAuth)
 	mux.HandleFunc("GET /api/export/alerts", s.exportAlerts)
 	mux.HandleFunc("GET /api/export/events", s.exportEvents)
+	mux.HandleFunc("GET /api/intel", s.intelIP)
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	mux.HandleFunc("GET /api/search", s.search)
@@ -62,6 +66,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/me/password", s.changePassword)
 	mux.HandleFunc("GET /login", s.serveLogin)
 	mux.HandleFunc("GET /login.html", s.serveLogin)
+	s.registerAgentRoutes(mux)
 	if s.DocsDir != "" {
 		mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/docs/", http.StatusFound)
@@ -451,6 +456,9 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	if source == "" {
 		source = r.RemoteAddr
 	}
+	if ag, ok := s.reqAgent(r); ok {
+		source = ag.Name
+	}
 	n := 0
 	if strings.Contains(ct, "application/json") {
 		var lines []string
@@ -528,6 +536,31 @@ func (s *Server) reportAuth(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+	}
+	writeJSON(w, rep)
+}
+
+func (s *Server) intelIP(w http.ResponseWriter, r *http.Request) {
+	ip := strings.TrimSpace(r.URL.Query().Get("ip"))
+	since := time.Now().Add(-24 * time.Hour)
+	if v := r.URL.Query().Get("since"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			since = time.Now().Add(-d)
+		}
+	}
+	rep, err := s.Store.IPIntel(ip, since)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	if intel.Enabled() && !rep.Private && net.ParseIP(ip) != nil {
+		if rep.Research == "local" || rep.Research == "stale" || rep.Research == "" {
+			s.Store.EnqueueIntel(ip, 3, "ui")
+			rep.Queued = true
+			rep.Research = "queued"
+		}
+	} else if !intel.Enabled() && (rep.Research == "local" || rep.Research == "") {
+		rep.Research = "off"
 	}
 	writeJSON(w, rep)
 }
@@ -628,7 +661,7 @@ func exportFile(kind string, since time.Time, source, format string) string {
 	if src != "" {
 		src = "-" + src
 	}
-	return "gpesiem-" + sanitizeFile(kind) + "-" + win + src + "." + format
+	return "gwd-" + sanitizeFile(kind) + "-" + win + src + "." + format
 }
 
 func sanitizeFile(s string) string {

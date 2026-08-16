@@ -5,15 +5,17 @@
 #   printf 'GWD_TOKEN=%s\n' "$(cat /etc/gpewebdefender/token)" > /etc/gpewebdefender/env
 #
 # Comma-separate more access logs on --tail if needed.
+# After you pair this host (DocHub 20), keep --cred so it can pull block orders:
+#   --cred /etc/gpewebdefender/agent.json
 
 [Unit]
-Description=gpesiem log shipper
+Description=gpewebdefender log shipper
 After=network.target
 
 [Service]
 Type=simple
-EnvironmentFile=/etc/gpewebdefender/env
-ExecStart=/usr/local/bin/gpewebdefender agent --url http://MONITOR:8787 --token ${GWD_TOKEN} --name WEBHOST --tail /var/log/nginx/access.log --journal
+EnvironmentFile=-/etc/gpewebdefender/env
+ExecStart=/usr/local/bin/gpewebdefender agent --url http://MONITOR:8787 --token ${GWD_TOKEN} --name WEBHOST --cred /etc/gpewebdefender/agent.json --tail /var/log/nginx/access.log --journal
 Restart=on-failure
 RestartSec=2
 

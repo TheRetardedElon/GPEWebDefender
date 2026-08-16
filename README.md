@@ -50,6 +50,10 @@ FTS5 on the manager. Keyword, IP, host, kind. Newest first (click **When** to fl
 
 ![Search: keyword brute](docs/shots/search-2.png)
 
+### Status
+
+**Status** is on demand. Click **Check now** (or **Check all paired hosts**) when you want load, memory, and disk. The manager answers immediately. A paired sensor answers on its next command poll (a few seconds). Charts are the snapshots *you* asked for — nothing is scraped in the background. Pairing is the same flow as block (DocHub **20** / **21**).
+
 ---
 
 ## Pick a shape
@@ -120,6 +124,8 @@ sudo ./deploy/install-agent.sh \
 
 Replace `MONITOR`, `web-1`, and the log path with *your* values.
 
+Optional later — that host can take block orders: Settings → Paired hosts → phrase + code, then add `--code ABCD-2341 --block fail2ban` to `install-agent.sh`. DocHub **20**.
+
 Then from your laptop:
 
 ```sh
@@ -153,6 +159,8 @@ Examples live in [`deploy/`](deploy/).
 5. Optional GeoIP: drop a MaxMind / DB-IP `.mmdb` and pass `--geoip`.
 6. Optional HTTPS: `deploy/nginx-gwd.conf.example`. Deny `/api/ingest` on the public vhost. DocHub **15** and **18**.
 7. Optional app denials the access log cannot see: POST JSON to `/api/ingest`. Never send passwords. DocHub **19**.
+8. Optional **block from the dashboard**: Settings → Paired hosts → invent a phrase → mint a code → on the sensor `gpewebdefender pair --url … --name web-1 --code … --block fail2ban` → Approve. DocHub **20**. Viewer and the ingest token cannot ban. Not automatic.
+9. Optional **Status**: open Status and click **Check** on the manager (works immediately). Pair a host (same as step 8) to Check that box for load / memory / disk. Nothing is polled until you click. Agents need 0.9.25+. DocHub **21**.
 
 If the UI is empty: you are not in demo, and no `--tail` / agent has sent a line yet. `journalctl -u gpewebdefender -n 50`.
 

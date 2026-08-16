@@ -2,6 +2,7 @@ package detect
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -39,6 +40,8 @@ type Rule struct {
 	DistinctPaths int     `yaml:"distinct_paths"`
 	EmptyReferer bool     `yaml:"empty_referer"`
 	MaxAssetRatio float64 `yaml:"max_asset_ratio"`
+	SkipLoopback bool     `yaml:"skip_loopback"`
+	SkipPrivate  bool     `yaml:"skip_private"`
 
 	re     *regexp.Regexp
 	notRe  *regexp.Regexp
@@ -310,6 +313,17 @@ func preFilter(r *Rule, ev event.Event) bool {
 		}
 		if !ok {
 			return false
+		}
+	}
+	if r.SkipLoopback || r.SkipPrivate {
+		ip := net.ParseIP(strings.TrimSpace(ev.SrcIP))
+		if ip != nil {
+			if r.SkipLoopback && ip.IsLoopback() {
+				return false
+			}
+			if r.SkipPrivate && (ip.IsLoopback() || ip.IsPrivate()) {
+				return false
+			}
 		}
 	}
 	if len(r.PathContains) > 0 {
@@ -593,6 +607,12 @@ func makeAlert(r *Rule, ev event.Event, evidence string, count int) event.Alert 
 		Count:    count,
 		Source:   ev.Source,
 		Tags:     append([]string(nil), r.Tags...),
+		Kind:     ev.Kind,
+		User:     ev.User,
+		Outcome:  ev.Outcome,
+		Path:     ev.Path,
+		Host:     ev.Host,
+		Reason:   ev.Reason,
 	}
 }
 

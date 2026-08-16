@@ -38,14 +38,16 @@
       <section class="block" id="why">
         <h2>Why this exists</h2>
         <p>
-          The ingest token is a <em>machine</em> secret. Every agent has it.
-          If that token could also change the operator password or create admins,
+          The ingest token is a <em>machine</em> secret. Every un-paired agent has it.
+          If that token could also change the operator password, create admins, or ban IPs,
           a stolen agent is a stolen dashboard. So after the first operator exists:
         </p>
         <ul>
-          <li><code>POST /api/ingest</code> still uses <code>Authorization: Bearer</code> (the ingest token).</li>
-          <li>Every other <code>/api/*</code> path (except health / login / setup / auth-status) needs a session cookie.</li>
+          <li><code>POST /api/ingest</code> still uses <code>Authorization: Bearer</code> (the ingest token, or a paired host key after Approve).</li>
+          <li>Every other <code>/api/*</code> path (except health / login / setup / auth-status / <code>/api/agent/pair</code>) needs a session cookie, <em>or</em> that host’s pair key on <code>/api/agent/*</code>.</li>
           <li>Settings → Operators is how you create users and rotate <em>your</em> password.</li>
+          <li>Settings → Paired hosts is how you mint codes, Approve, and ban. Viewer and ingest token cannot. <a href="20-pair-and-block.html">20</a>.</li>
+          <li>Status → Check is admin-only. Viewers can see the last snapshot. <a href="21-host-status.html">21</a>.</li>
         </ul>
         <div class="callout info">
           <strong>nginx htpasswd is optional extra</strong>
@@ -83,13 +85,13 @@
           <tbody>
             <tr>
               <td><code>admin</code></td>
-              <td>Dashboard, search, reports, Settings writes, create / disable / delete users, reset their passwords, change own password</td>
+              <td>Dashboard, search, reports, Settings writes, create / disable / delete users, reset their passwords, change own password, pair hosts, approve, ban / unban</td>
               <td>Delete or disable the last remaining admin. See or set the ingest token.</td>
             </tr>
             <tr>
               <td><code>viewer</code></td>
               <td>Dashboard, search, reports, change own password</td>
-              <td>Create users, save Settings, reset anyone else’s password</td>
+              <td>Create users, save Settings, reset anyone else’s password, mint pair codes, approve hosts, ban</td>
             </tr>
           </tbody>
         </table>

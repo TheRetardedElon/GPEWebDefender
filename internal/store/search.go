@@ -52,8 +52,8 @@ func (s *Store) indexEvent(ev event.Event) {
 func (s *Store) indexAlert(al event.Alert) {
 	_, _ = s.db.Exec(`DELETE FROM search_idx WHERE bucket = 'alert' AND ref = ?`, al.ID)
 	_, _ = s.db.Exec(`INSERT INTO search_idx(bucket, ref, num, src_ip, user, host, source, path, url, title, evidence, kind, category, ts)
-		VALUES('alert', ?, ?, ?, '', '', ?, '', ?, ?, ?, '', ?, ?)`,
-		al.ID, fmt.Sprintf("%d", al.Num), al.SrcIP, al.Source, al.URL, al.Title, al.Evidence, al.Category, fmt.Sprintf("%d", al.Time.UTC().UnixMilli()))
+		VALUES('alert', ?, ?, ?, ?, '', ?, '', ?, ?, ?, ?, ?, ?)`,
+		al.ID, fmt.Sprintf("%d", al.Num), al.SrcIP, al.User, al.Source, al.URL, al.Title, al.Evidence, al.Kind, al.Category, fmt.Sprintf("%d", al.Time.UTC().UnixMilli()))
 }
 
 type SearchQuery struct {

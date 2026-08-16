@@ -85,6 +85,22 @@ func TestReports(t *testing.T) {
 	if err != nil || len(exp) != 1 || exp[0].Title != "SQLi" {
 		t.Fatalf("export: %+v %v", exp, err)
 	}
+	intel, err := st.IPIntel("1.1.1.1", now.Add(-time.Hour))
+	if err != nil || intel.Alerts != 1 || intel.Weight <= 0 || intel.Verdict == "" {
+		t.Fatalf("intel: %+v %v", intel, err)
+	}
+	loc, err := st.IPIntel("127.0.0.1", now.Add(-time.Hour))
+	if err != nil || !loc.Private || loc.Verdict != "local" {
+		t.Fatalf("private intel: %+v %v", loc, err)
+	}
+	st.EnqueueIntel("127.0.0.1", 1, "nope")
+	if st.IntelQueueDepth() != 0 {
+		t.Fatalf("private must not queue")
+	}
+	st.EnqueueIntel("203.0.113.9", 1, "test")
+	if st.IntelQueueDepth() != 1 {
+		t.Fatalf("queue depth %d", st.IntelQueueDepth())
+	}
 	web, err := st.AuthReport("web", now.Add(-time.Hour), "")
 	if err != nil || web.Fails < 1 {
 		t.Fatalf("web: %+v %v", web, err)
@@ -96,6 +112,40 @@ func TestReports(t *testing.T) {
 	app, err := st.AuthReport("app", now.Add(-time.Hour), "")
 	if err != nil || app.Fails != 1 || len(app.ByUser) != 1 {
 		t.Fatalf("app: %+v %v", app, err)
+	}
+}
+
+func TestAlertStoryRoundtrip(t *testing.T) {
+	dir := t.TempDir()
+	st, err := Open(filepath.Join(dir, "s.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	now := time.Now().UTC()
+	must := func(e error) {
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	must(st.InsertEvent(event.Event{
+		ID: "e-ssh", Time: now, SrcIP: "203.0.113.9", Method: "SSH",
+		URL: "failed password for root from 203.0.113.9", Status: 401,
+		User: "root", Kind: "hostauth", Outcome: "fail", Source: "devbox",
+	}))
+	must(st.InsertAlert(&event.Alert{
+		ID: "a-ssh", Time: now, EventID: "e-ssh", Title: "SSH failed login as root",
+		Severity: "medium", Category: "hostauth", SrcIP: "203.0.113.9",
+		Method: "SSH", URL: "failed password for root from 203.0.113.9", Status: 401,
+		Evidence: "root", Source: "devbox", Kind: "hostauth", User: "root", Outcome: "fail",
+	}))
+	page, err := st.Alerts(AlertQuery{Limit: 10})
+	if err != nil || len(page.Alerts) != 1 {
+		t.Fatalf("page: %+v %v", page, err)
+	}
+	a := page.Alerts[0]
+	if a.Kind != "hostauth" || a.User != "root" || a.Outcome != "fail" || a.Source != "devbox" {
+		t.Fatalf("story: %+v", a)
 	}
 }
 

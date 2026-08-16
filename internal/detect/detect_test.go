@@ -68,6 +68,29 @@ func hasRule(alerts []event.Alert, id string) bool {
 	return false
 }
 
+func TestSSHRootCarriesStory(t *testing.T) {
+	e := loadWeb(t)
+	ev, ok := parse.Parse(`Aug 16 00:18:01 box sshd[11]: Failed password for root from 203.0.113.9 port 22 ssh2`, "devbox")
+	if !ok {
+		t.Fatal("parse")
+	}
+	ev.ID = "ssh1"
+	ev.Time = time.Now().UTC()
+	got := e.Evaluate(ev)
+	var hit event.Alert
+	for _, a := range got {
+		if a.RuleID == "linux.ssh.root" {
+			hit = a
+		}
+	}
+	if hit.RuleID == "" {
+		t.Fatalf("expected linux.ssh.root, got %+v", got)
+	}
+	if hit.Kind != event.KindHostAuth || hit.User != "root" || hit.Outcome != event.OutcomeFail || hit.Source != "devbox" {
+		t.Fatalf("story: %+v", hit)
+	}
+}
+
 func TestSQLi(t *testing.T) {
 	e := loadWeb(t)
 	line := `1.1.1.1 - - [14/Aug/2026:12:00:01 +0000] "GET /x?id=1%20UNION%20SELECT%20password HTTP/1.1" 200 1 "-" "Mozilla"`
@@ -92,6 +115,25 @@ func TestEnvProbe(t *testing.T) {
 	al := hit(t, e, line)
 	if !hasRule(al, "web.recon.env") {
 		t.Fatalf("missed .env: %+v", al)
+	}
+}
+
+func TestSecretServedAndLoopbackSkip(t *testing.T) {
+	e := loadWeb(t)
+	leak := `203.0.113.9 - - [14/Aug/2026:12:00:01 +0000] "GET /.env HTTP/1.1" 200 80 "-" "curl/8"`
+	al := hit(t, e, leak)
+	if !hasRule(al, "web.secret.served") {
+		t.Fatalf("missed leak: %+v", al)
+	}
+	cfg := `198.51.100.4 - - [14/Aug/2026:12:00:01 +0000] "GET /wp-config.php HTTP/1.1" 404 1 "-" "Mozilla"`
+	al = hit(t, e, cfg)
+	if !hasRule(al, "web.recon.env") {
+		t.Fatalf("missed wp-config probe: %+v", al)
+	}
+	local := `127.0.0.1 - - [14/Aug/2026:12:00:01 +0000] "GET /.env HTTP/1.1" 200 80 "-" "curl/8"`
+	al = hit(t, e, local)
+	if hasRule(al, "web.secret.served") || hasRule(al, "web.recon.env") {
+		t.Fatalf("loopback should be quiet: %+v", al)
 	}
 }
 

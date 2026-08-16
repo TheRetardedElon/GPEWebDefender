@@ -7,6 +7,10 @@
 #     --tail /var/log/nginx/access.log \
 #     --journal
 #
+# Optional pairing (block orders from the dashboard):
+#   --code ABCD-2341 --block fail2ban
+# You will be asked for the enrollment phrase (the one you set in Settings).
+#
 # The token is read from /etc/gpewebdefender/env on this box, or from --token,
 # or you can copy the manager's env file first:
 #   scp root@MONITOR:/etc/gpewebdefender/env /etc/gpewebdefender/env
@@ -21,6 +25,8 @@ TAIL=""
 JOURNAL=0
 TOKEN=""
 BIN_SRC=""
+PAIR_CODE=""
+BLOCK=""
 
 usage() {
   cat <<'EOF'
@@ -31,10 +37,14 @@ install-agent.sh — ship access logs (and optional sshd) to the manager.
   --tail PATH       access log (comma-separate more than one)
   --journal         follow systemd journal for sshd/sudo
   --token SECRET    ingest token (otherwise use /etc/gpewebdefender/env)
+  --code CODE       one-time pair code from Settings (optional)
+  --block BACKEND   fail2ban | ufw | off  (only with --code)
   --bin FILE        Linux binary if we cannot find it
   -h, --help
 
-Need at least --tail or --journal. Same token as the manager.
+Need at least --tail or --journal.
+Log shipping still uses the shared ingest token.
+Pairing is extra: a phrase you invent + this code + Approve in the UI.
 EOF
 }
 
@@ -45,6 +55,8 @@ while [ $# -gt 0 ]; do
     --tail) TAIL="${2:-}"; shift ;;
     --journal) JOURNAL=1 ;;
     --token) TOKEN="${2:-}"; shift ;;
+    --code) PAIR_CODE="${2:-}"; shift ;;
+    --block) BLOCK="${2:-}"; shift ;;
     --bin) BIN_SRC="${2:-}"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown flag: $1" >&2; usage >&2; exit 2 ;;
@@ -92,9 +104,15 @@ if [ -n "$TOKEN" ]; then
   echo "GWD_TOKEN=$TOKEN" > "$ETC/env"
   chmod 640 "$ETC/env"
 elif [ ! -f "$ETC/env" ]; then
-  echo "no token. copy the manager env file or pass --token." >&2
-  echo "  scp root@MONITOR:$ETC/env $ETC/env" >&2
-  exit 1
+  if [ -z "$PAIR_CODE" ]; then
+    echo "no token. copy the manager env file or pass --token." >&2
+    echo "  scp root@MONITOR:$ETC/env $ETC/env" >&2
+    echo "or pair this host: pass --code from Settings." >&2
+    exit 1
+  fi
+  umask 077
+  echo "# pair this host; add GWD_TOKEN=... if you also want the shared ingest secret" > "$ETC/env"
+  chmod 640 "$ETC/env"
 fi
 
 install -o root -g root -m 755 "$bin" "$BIN"
@@ -110,14 +128,21 @@ After=network.target
 
 [Service]
 Type=simple
-EnvironmentFile=$ETC/env
-ExecStart=$BIN agent --url $URL --token \${GWD_TOKEN} --name $AGENT_NAME$extra
+EnvironmentFile=-$ETC/env
+ExecStart=$BIN agent --url $URL --name $AGENT_NAME --cred $ETC/agent.json --token \${GWD_TOKEN}$extra
 Restart=on-failure
 RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
+if [ -n "$PAIR_CODE" ]; then
+  extra_pair="--cred $ETC/agent.json"
+  [ -n "$BLOCK" ] && extra_pair="$extra_pair --block $BLOCK"
+  echo "pairing $AGENT_NAME — type the enrollment phrase when asked."
+  "$BIN" pair --url "$URL" --name "$AGENT_NAME" --code "$PAIR_CODE" $extra_pair
+fi
 
 systemctl daemon-reload
 systemctl enable --now "${NAME}-agent"
@@ -130,4 +155,5 @@ echo
 echo "on the manager firewall, allow THIS box's IP to the ingest port."
 echo "in the UI, the Hosts dropdown should show \"$AGENT_NAME\" after the first line."
 echo "optional: Settings → add a map row with the same name and a lat,lon or ISO country."
+echo "optional: after Approve, Status → Check now pulls load / memory / disk from this box (0.9.25+ binary)."
 echo

@@ -2,13 +2,13 @@
 # Fill /etc/gpewebdefender/env on the box. Do not commit real tokens.
 
 [Unit]
-Description=gpesiem web-attack monitor
+Description=gpewebdefender web-attack monitor
 After=network.target
 
 [Service]
 Type=simple
-User=gpesiem
-Group=gpesiem
+User=gpewebdefender
+Group=gpewebdefender
 WorkingDirectory=/var/lib/gpewebdefender
 EnvironmentFile=/etc/gpewebdefender/env
 ExecStart=/usr/local/bin/gpewebdefender serve --listen 127.0.0.1:8787 --db /var/lib/gpewebdefender/gpewebdefender.db --home 40.7,-74.0 --homes ${GWD_HOMES} --token ${GWD_TOKEN} --retain 168h

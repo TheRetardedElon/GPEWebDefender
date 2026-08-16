@@ -41,6 +41,8 @@
             <tr><td>auth.log parser (sshd / sudo / PAM only)</td><td>05 · 16</td></tr>
             <tr><td>Operator accounts (Argon2id, sessions, lockout)</td><td>18</td></tr>
             <tr><td>Two-plane ingest + skip quiet static 200s + app hook chapter</td><td>19</td></tr>
+            <tr><td>Host pairing + admin block via fail2ban / UFW / Windows Firewall</td><td>20</td></tr>
+            <tr><td>On-demand host Status (load / memory / disk, no background poll)</td><td>21</td></tr>
           </tbody>
         </table>
       </section>
@@ -74,6 +76,11 @@
               <td>Webhook / email on critical</td>
               <td>A dashboard you are not staring at is not an alert</td>
               <td>Keep it a POST of the alert JSON</td>
+            </tr>
+            <tr>
+              <td>Auto-ban from a rule</td>
+              <td>We will not do this until manual block is boring. Easy to lock yourself out.</td>
+              <td>Manual only today — ch. 20.</td>
             </tr>
             <tr>
               <td>Blocklist export</td>

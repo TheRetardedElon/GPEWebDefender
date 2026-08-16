@@ -1,0 +1,5 @@
+# /etc/fail2ban/filter.d/gpesiem.conf
+# The agent bans with fail2ban-client set gpesiem banip — this filter matches nothing.
+[Definition]
+failregex =
+ignoreregex =

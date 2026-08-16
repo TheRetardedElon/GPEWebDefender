@@ -20,7 +20,7 @@
           Both end at the same place: a binary, a token, a UI on localhost.
         </p>
         <div class="meta-row">
-          <span class="pill live">Reviewed 2026-08-15</span>
+          <span class="pill live">Reviewed 2026-08-16</span>
           <span class="pill">Method A · script</span>
           <span class="pill">Method B · by hand</span>
         </div>
@@ -101,7 +101,7 @@ sudo ./deploy/install-agent.sh \
         </p>
         <div class="callout good">
           <strong>What the script actually does</strong>
-          Creates the <code>gpesiem</code> user, writes a random token to <code>/etc/gpewebdefender/env</code> if missing,
+          Creates the <code>gpewebdefender</code> user, writes a random token to <code>/etc/gpewebdefender/env</code> if missing,
           copies the binary + rules + this DocHub, installs systemd, starts the unit.
           It will not overwrite an existing token.
         </div>
@@ -112,12 +112,12 @@ sudo ./deploy/install-agent.sh \
         <p>Same result as A. Use this if you do not want a script, or you are not on systemd.</p>
         <ol>
           <li>Copy the Linux binary to <code>/usr/local/bin/gpewebdefender</code> and <code>chmod +x</code> it.</li>
-          <li><code>useradd --system --home /var/lib/gpewebdefender --shell /usr/sbin/nologin gpesiem</code></li>
-          <li>Copy <code>rules/</code> and <code>dochub/</code> into <code>/var/lib/gpewebdefender/</code>. <code>chown -R gpesiem:gpesiem</code>.</li>
+          <li><code>useradd --system --home /var/lib/gpewebdefender --shell /usr/sbin/nologin gpewebdefender</code></li>
+          <li>Copy <code>rules/</code> and <code>dochub/</code> into <code>/var/lib/gpewebdefender/</code>. <code>chown -R gpewebdefender:gpewebdefender</code>.</li>
           <li>Copy <code>deploy/env.example</code> to <code>/etc/gpewebdefender/env</code>. Put a long random value in <code>GWD_TOKEN</code>. Mode <code>640</code>.</li>
           <li>Copy <code>deploy/gpewebdefender.service.example</code> to <code>/etc/systemd/system/gpewebdefender.service</code>. Edit listen / home / tail if you need them.</li>
-          <li><code>systemctl daemon-reload &amp;&amp; systemctl enable --now gpesiem</code></li>
-          <li>For each other host: copy <code>deploy/gpewebdefender-agent.service.example</code>, set <code>--url</code>, <code>--name</code>, <code>--tail</code>, same token.</li>
+          <li><code>systemctl daemon-reload &amp;&amp; systemctl enable --now gpewebdefender</code></li>
+          <li>For each other host: copy <code>deploy/gpewebdefender-agent.service.example</code>, set <code>--url</code>, <code>--name</code>, <code>--tail</code>, same token. Optional later: pair that host (ch. <a href="20-pair-and-block.html">20</a>) so it can take block orders.</li>
         </ol>
         <p>Full unit files and nginx: <a href="10-deploy.html">10</a> and <code>deploy/README.md</code>.</p>
       </section>
@@ -138,11 +138,13 @@ sudo ./deploy/install-agent.sh \
           <li>Open <strong>Reports → Insight</strong>. 1h / 24h / 7d is a real clock. CSV / JSON export is the same window.</li>
           <li>Optional: drop a GeoLite2 / DB-IP <code>.mmdb</code> on the manager and pass <code>--geoip</code> (or re-run the script with <code>--geoip</code>). Without it, countries are coarse.</li>
           <li>Optional HTTPS: copy <code>deploy/nginx-gwd.conf.example</code>, certbot, keep ingest off that vhost. See <a href="15-production-edge.html">15</a> and <a href="18-operator-accounts.html">18</a>.</li>
+          <li>Optional block from the dashboard: Settings → Paired hosts → invent a phrase → mint a code → <code>gpewebdefender pair</code> on that box → Approve. Chapter <a href="20-pair-and-block.html">20</a>.</li>
+          <li>Optional Status: open <strong>Status</strong> and click Check on the manager. Pair a host (same as the block step) if you want load / memory / disk from that box too. Nothing is polled until you click. Chapter <a href="21-host-status.html">21</a>.</li>
         </ol>
         <div class="callout info">
           <strong>If the UI is empty</strong>
           Demo not running, and no agent / <code>--tail</code> has sent a line yet.
-          Check <code>journalctl -u gpesiem -n 50</code> and that the log path exists and is readable.
+          Check <code>journalctl -u gpewebdefender -n 50</code> and that the log path exists and is readable.
         </div>
       </section>
 
@@ -154,18 +156,18 @@ sudo ./deploy/install-agent.sh \
           <tbody>
             <tr>
               <td>Windows</td>
-              <td><code>go build -o gpewebdefender.exe .\cmd\gpesiem</code></td>
+              <td><code>go build -o gpewebdefender.exe .\cmd\gpewebdefender</code></td>
               <td><code>gpewebdefender.exe</code></td>
             </tr>
             <tr>
               <td>Linux</td>
-              <td><code>go build -o gpesiem ./cmd/gpesiem</code></td>
-              <td><code>gpesiem</code></td>
+              <td><code>go build -o gpewebdefender ./cmd/gpewebdefender</code></td>
+              <td><code>gpewebdefender</code></td>
             </tr>
             <tr>
               <td>Windows → Linux</td>
-              <td><code>$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o gpesiem-linux-amd64 .\cmd\gpesiem</code></td>
-              <td><code>gpesiem-linux-amd64</code></td>
+              <td><code>$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o gpewebdefender-linux-amd64 .\cmd\gpewebdefender</code></td>
+              <td><code>gpewebdefender-linux-amd64</code></td>
             </tr>
           </tbody>
         </table>
@@ -219,8 +221,24 @@ sudo ./deploy/install-agent.sh \
             <tr><td><code>--name</code></td><td>hostname</td><td><code>X-SIEM-Source</code> — use a stable name</td></tr>
             <tr><td><code>--from-start</code></td><td>false</td><td>Ship historical lines too</td></tr>
             <tr><td><code>--journal</code></td><td>false</td><td>sshd / sudo from journald</td></tr>
+            <tr><td><code>--cred</code></td><td><code>/etc/gpewebdefender/agent.json</code> if that dir exists</td><td>Paired host key. After Approve, used for ingest + block-order poll</td></tr>
+            <tr><td><code>--block</code></td><td>detect / off</td><td><code>fail2ban</code>, <code>ufw</code>, <code>windows</code>, or <code>off</code>. Local off wins</td></tr>
+            <tr><td><code>--jail</code></td><td><code>gpewebdefender</code></td><td>fail2ban jail for dashboard bans — not the sshd jail</td></tr>
           </tbody>
         </table>
+        <h3>pair</h3>
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--url</code></td><td>required</td><td>Manager base URL</td></tr>
+            <tr><td><code>--name</code></td><td>hostname</td><td>Must match the agent <code>--name</code> you want in the UI</td></tr>
+            <tr><td><code>--code</code></td><td>required</td><td>One-time code from Settings → Pair a host…</td></tr>
+            <tr><td><code>--phrase</code> / env <code>GWD_PAIR_PHRASE</code></td><td>prompt</td><td>The enrollment phrase you invented. Do not commit it</td></tr>
+            <tr><td><code>--block</code></td><td>detect</td><td>Same as agent</td></tr>
+            <tr><td><code>--cred</code></td><td>same as agent</td><td>Where the host key is written (mode 0600)</td></tr>
+          </tbody>
+        </table>
+        <p>Pairing is optional. Log shipping works with only the ingest token. Full walk-through: <a href="20-pair-and-block.html">20</a>.</p>
       </section>
 
       <footer class="foot">GPEWebDefender DocHub · 03 · next: <a href="04-demo-vs-live.html">04 · Demo vs live</a></footer>

@@ -181,4 +181,6 @@ echo "  create the first admin. that is a dashboard user, not the ingest token."
 echo
 echo "docs on the box: http://127.0.0.1:8787/docs/"
 echo "add another host:  sudo ./deploy/install-agent.sh --url http://THISBOX:8787 --name web-1 --tail /var/log/nginx/access.log"
+echo "optional block orders: Settings → Paired hosts → phrase + code, then install-agent.sh --code … --block fail2ban"
+echo "Status tab: Check the manager any time. Pair a host to Check that box too (load / memory / disk, on demand)."
 echo

@@ -7,6 +7,7 @@ rules:
     category: recon
     mitre: [T1595.003]
     tags: [probe]
+    skip_loopback: true
     fields: [path]
     pattern: '(?i)(/\.(aws|kube)/|/\.docker/config\.json|/docker-compose\.ya?ml|/Dockerfile|/Procfile|/package\.json|/composer\.json|/pom\.xml|/Cargo\.toml|/go\.mod)'
 
@@ -16,6 +17,7 @@ rules:
     category: recon
     mitre: [T1595.003]
     tags: [probe]
+    skip_loopback: true
     fields: [decoded]
     pattern: '(?i)/\.env(\.(local|production|prod|staging|dev|backup|example|test)|rc|_sample)(/|$|\?)'
 

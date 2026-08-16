@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>20 · Pair &amp; block — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>20 · Pair a host and block an IP</h1>
+        <p class="lead">
+          Optional. Log shipping still works with the shared ingest token.
+          Pairing is how <em>your</em> monitor is allowed to tell <em>your</em> sensor
+          to ban an IP on that box’s firewall. Same steps on any deployment.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Added 2026-08-16</span>
+          <span class="pill">Admin only</span>
+        </div>
+      </header>
+
+      <section class="block">
+        <h2>What this is not</h2>
+        <ul>
+          <li>Not a WAF. Traffic is not proxied.</li>
+          <li>Not the manager SSHing into the host. The sensor <em>pulls</em> orders.</li>
+          <li>Not automatic. An admin clicks Block. Rules do not ban on their own.</li>
+          <li>Not something a viewer or the ingest token can do.</li>
+        </ul>
+      </section>
+
+      <section class="block">
+        <h2>Three human steps</h2>
+        <ol>
+          <li><strong>Enrollment phrase</strong> — you invent this in Settings → Paired hosts. At least 12 characters. Stored as Argon2id. Never shown again. This is unique to your install.</li>
+          <li><strong>One-time code</strong> — Pair a host… mints <code>ABCD-2341</code>. Lives 15 minutes. Single use. Hashed at rest.</li>
+          <li><strong>Approve</strong> — the host appears as pending with a fingerprint and the IP it called from. You look at it. Approve or Reject.</li>
+        </ol>
+        <p>After Approve the host gets its own key in <code>/etc/gpewebdefender/agent.json</code> (mode 0600). That key is the only thing that can pick up block orders <em>or</em> answer a Status check for that name.</p>
+      </section>
+
+      <section class="block">
+        <h2>On the host</h2>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code>gpewebdefender pair \
+  --url https://YOUR-MONITOR \
+  --name web-1 \
+  --code ABCD-2341 \
+  --block fail2ban
+
+# then, same as before:
+gpewebdefender agent --url https://YOUR-MONITOR --name web-1 \
+  --tail /var/log/nginx/access.log --journal</code></pre>
+        <p>It will ask for the enrollment phrase. Or pass it in the environment as <code>GWD_PAIR_PHRASE</code> if you are scripting (do not commit that).</p>
+        <p><code>--block</code> is <code>fail2ban</code>, <code>ufw</code>, <code>windows</code>, or <code>off</code>. Local <code>off</code> wins — the dashboard cannot override it. The agent will try to install a dedicated fail2ban jail named <code>gpesiem</code> if it is missing. A hand copy lives in <code>deploy/fail2ban-gpesiem.jail</code> and <code>deploy/fail2ban-gpesiem.filter</code>.</p>
+        <p>The install script accepts the same flags: <code>install-agent.sh --url … --name web-1 --tail … --code ABCD-2341 --block fail2ban</code>.</p>
+      </section>
+
+      <section class="block">
+        <h2>Already shipping logs?</h2>
+        <p>Leave it. The old ingest token still works. Pairing is extra.</p>
+        <ol>
+          <li>Put a binary that includes <code>pair</code> (0.9.19+) on that host. Same file as the manager.</li>
+          <li>Mint a code on the manager. Run <code>pair</code> with the <em>same</em> <code>--name</code> the agent already uses.</li>
+          <li>Approve the fingerprint.</li>
+          <li>Point the agent unit at <code>--cred /etc/gpewebdefender/agent.json</code> and restart it so it can poll for orders. <code>deploy/gpewebdefender-agent.service.example</code> already has that flag.</li>
+        </ol>
+        <p>The dedicated fail2ban jail is <code>gpesiem</code>. It is not the sshd jail. Local sshd fail2ban you already run stays yours.</p>
+      </section>
+
+      <section class="block">
+        <h2>Blocking from the dashboard</h2>
+        <p>Open an alert. If that host is paired and you are an admin: <strong>Block on this host 1h / 24h</strong>, or all paired hosts. Confirm. The sensor picks the order up within a few seconds.</p>
+        <p>Rails:</p>
+        <ul>
+          <li>Public unicast IPs only. No RFC1918, loopback, link-local, CGNAT.</li>
+          <li>Will not ban the host’s own seen address or your current session IP.</li>
+          <li>Durations: 15m, 1h, 24h, 7d, or until you unban.</li>
+          <li>Cap of 200 active bans per host. Commands expire in 2 minutes if the sensor is down.</li>
+          <li>Audit row: who, which IP, which host, how long.</li>
+        </ul>
+        <p>Unpair: Revoke on the host row. That key dies. Log shipping with the shared ingest token can continue.</p>
+      </section>
+
+      <section class="block">
+        <h2>API (for operators writing glue)</h2>
+        <table>
+          <thead><tr><th>Call</th><th>Who</th></tr></thead>
+          <tbody>
+            <tr><td><code>POST /api/pair-phrase</code></td><td>admin session</td></tr>
+            <tr><td><code>POST /api/pair-codes</code></td><td>admin session — returns the code once</td></tr>
+            <tr><td><code>POST /api/agent/pair</code></td><td>open, rate-limited — phrase + code + name</td></tr>
+            <tr><td><code>GET /api/agent/commands</code></td><td>that host’s key, only after Approve (<code>ban</code> / <code>unban</code> / <code>list</code> / <code>stats</code>)</td></tr>
+            <tr><td><code>POST /api/agents/{id}/ban</code></td><td>admin session</td></tr>
+          </tbody>
+        </table>
+        <p>The ingest Bearer cannot mint codes, approve, or ban.</p>
+      </section>
+
+      <section class="block">
+        <h2>Status checks use the same channel</h2>
+        <p>
+          After Approve, an admin can open <strong>Status</strong> and click Check.
+          The sensor posts one snapshot (load, memory, disk) and stops.
+          Same poll as block orders. Binary 0.9.25+. Chapter <a href="21-host-status.html">21</a>.
+        </p>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 20 · next: <a href="21-host-status.html">21 · Host status</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+</body>
+</html>

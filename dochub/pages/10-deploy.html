@@ -21,7 +21,7 @@
           If you want the script to do this, start at <a href="03-install-and-run.html">03 · Method A</a>. This page is the same thing, written out.
         </p>
         <div class="meta-row">
-          <span class="pill live">Reviewed 2026-08-15</span>
+          <span class="pill live">Reviewed 2026-08-16</span>
           <span class="pill">2 CPU / 2 GB is enough</span>
           <span class="pill warn">Localhost only</span>
         </div>
@@ -80,19 +80,19 @@ flowchart LR
         </p>
         <ol>
           <li>Copy the Linux binary to <code>/usr/local/bin/gpewebdefender</code>.</li>
-          <li>System user <code>gpesiem</code>, home <code>/var/lib/gpewebdefender</code>.</li>
+          <li>System user <code>gpewebdefender</code>, home <code>/var/lib/gpewebdefender</code>.</li>
           <li>Copy <code>rules/*.yaml</code> to <code>/var/lib/gpewebdefender/rules</code> (cwd of the service).</li>
           <li>Copy this DocHub to <code>/var/lib/gpewebdefender/dochub</code>.</li>
-          <li>Put a long random ingest secret in <code>/etc/gpewebdefender/token</code> (mode 640). Load it via an env file — do not paste it into git or this page.</li>
+          <li>Copy <code>deploy/env.example</code> to <code>/etc/gpewebdefender/env</code> (mode 640). Put a long random value in <code>GWD_TOKEN</code>. Do not paste it into git or this page.</li>
         </ol>
         <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>[Unit]
-Description=gpesiem web-attack monitor
+Description=gpewebdefender web-attack monitor
 After=network.target
 
 [Service]
 Type=simple
-User=gpesiem
-Group=gpesiem
+User=gpewebdefender
+Group=gpewebdefender
 WorkingDirectory=/var/lib/gpewebdefender
 EnvironmentFile=/etc/gpewebdefender/env
 ExecStart=/usr/local/bin/gpewebdefender serve \
@@ -100,7 +100,8 @@ ExecStart=/usr/local/bin/gpewebdefender serve \
   --db /var/lib/gpewebdefender/gpewebdefender.db \
   --home 40.7,-74.0 \
   --token ${GWD_TOKEN} \
-  --retain 168h
+  --retain 168h \
+  --docs /var/lib/gpewebdefender/dochub
 Restart=on-failure
 RestartSec=2
 
@@ -120,11 +121,15 @@ WantedBy=multi-user.target</code></pre>
 
       <section class="block" id="agent">
         <h2>Agent (each web host)</h2>
-        <p>Fast path: <code>sudo ./deploy/install-agent.sh --url http://MONITOR:8787 --name web-1 --tail /var/log/nginx/access.log --journal</code></p>
-        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>gpewebdefender agent \
+        <p>Fast path (logs only): <code>sudo ./deploy/install-agent.sh --url http://MONITOR:8787 --name web-1 --tail /var/log/nginx/access.log --journal</code></p>
+        <p>Same script with pairing: add <code>--code ABCD-2341 --block fail2ban</code> after you mint a code in Settings. Chapter <a href="20-pair-and-block.html">20</a>. After Approve, Status → Check now also works on that host (ch. <a href="21-host-status.html">21</a>).</p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code># token lives in /etc/gpewebdefender/env as GWD_TOKEN=…
+gpewebdefender agent \
   --url http://MONITOR_INTERNAL:8787 \
-  --token "$(cat /etc/gpewebdefender/token)" \
+  --token "$GWD_TOKEN" \
+  --cred /etc/gpewebdefender/agent.json \
   --tail /var/log/nginx/access.log \
+  --journal \
   --name web-1</code></pre>
         <p>
           Prefer a private NIC, VPN, or SSH tunnel over exposing ingest.

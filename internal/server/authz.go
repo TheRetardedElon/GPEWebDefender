@@ -17,6 +17,7 @@ import (
 type ctxKey int
 
 const userCtx ctxKey = 1
+const agentCtx ctxKey = 2
 
 const sessionCookie = "siem_session"
 const sessionTTL = 12 * time.Hour
@@ -84,10 +85,34 @@ func (s *Server) auth(next http.Handler) http.Handler {
 		}
 
 		if r.URL.Path == "/api/ingest" {
+			if ag, ok := s.agentFromReq(r); ok {
+				if ag.Status != store.AgentActive {
+					http.Error(w, "agent not approved", http.StatusForbidden)
+					return
+				}
+				r = r.WithContext(context.WithValue(r.Context(), agentCtx, ag))
+				next.ServeHTTP(w, r)
+				return
+			}
 			if !s.bearerOK(r) {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if r.URL.Path == "/api/agent/pair" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/agent/") {
+			ag, ok := s.agentFromReq(r)
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			r = r.WithContext(context.WithValue(r.Context(), agentCtx, ag))
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -123,6 +148,29 @@ func (s *Server) auth(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) reqAgent(r *http.Request) (store.Agent, bool) {
+	a, ok := r.Context().Value(agentCtx).(store.Agent)
+	return a, ok && a.ID != ""
+}
+
+func (s *Server) agentFromReq(r *http.Request) (store.Agent, bool) {
+	got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if got == "" {
+		return store.Agent{}, false
+	}
+	if s.Token != "" && auth.TokensEqual(got, s.Token) {
+		return store.Agent{}, false
+	}
+	a, err := s.Store.AgentBySecret(got)
+	if err != nil {
+		return store.Agent{}, false
+	}
+	if a.Status == store.AgentRevoked || a.Status == store.AgentRejected {
+		return store.Agent{}, false
+	}
+	return a, true
 }
 
 func (s *Server) bearerOK(r *http.Request) bool {

@@ -104,13 +104,29 @@ CREATE INDEX IF NOT EXISTS al_source ON alerts(source);
 		"ALTER TABLE alerts ADD COLUMN num INTEGER",
 		"CREATE UNIQUE INDEX IF NOT EXISTS al_num ON alerts(num)",
 		`CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
+		"ALTER TABLE alerts ADD COLUMN kind TEXT",
+		"ALTER TABLE alerts ADD COLUMN user TEXT",
+		"ALTER TABLE alerts ADD COLUMN outcome TEXT",
+		"ALTER TABLE alerts ADD COLUMN path TEXT",
+		"ALTER TABLE alerts ADD COLUMN host TEXT",
+		"ALTER TABLE alerts ADD COLUMN reason TEXT",
 	} {
 		_, _ = s.db.Exec(col) // already-exists is fine
 	}
+	s.backfillAlertStory()
 	if err := s.backfillAlertNums(); err != nil {
 		return err
 	}
 	if err := s.initUsers(); err != nil {
+		return err
+	}
+	if err := s.initIntel(); err != nil {
+		return err
+	}
+	if err := s.initAgents(); err != nil {
+		return err
+	}
+	if err := s.initStatus(); err != nil {
 		return err
 	}
 	_, _ = s.db.Exec(`UPDATE events SET kind = 'tenantlogin' WHERE lower(IFNULL(kind,'')) IN
@@ -139,6 +155,72 @@ UPDATE alerts SET num = (
 		ON CONFLICT(k) DO UPDATE SET v = CASE WHEN CAST(v AS INTEGER) < ? THEN ? ELSE v END`,
 		fmt.Sprintf("%d", n), n, fmt.Sprintf("%d", n))
 	return err
+}
+
+func (s *Store) backfillAlertStory() {
+	// Copy the event story onto older alerts so the inspect card is not a web-log dump.
+	for _, col := range []string{"kind", "user", "outcome", "path", "host", "reason"} {
+		_, _ = s.db.Exec(`UPDATE alerts SET `+col+` = (
+			SELECT e.`+col+` FROM events e WHERE e.id = alerts.event_id AND IFNULL(e.`+col+`,'') != ''
+		) WHERE IFNULL(`+col+`,'') = '' AND IFNULL(event_id,'') != ''`)
+	}
+	_, _ = s.db.Exec(`UPDATE alerts SET kind = CASE
+		WHEN category = 'hostauth' THEN 'hostauth'
+		WHEN category = 'applogin' THEN 'applogin'
+		WHEN category = 'tenant' THEN 'tenantlogin'
+		WHEN category IN ('canary','authz','secprobe','tamper') THEN 'secprobe'
+		WHEN upper(IFNULL(method,'')) IN ('SSH','SUDO') THEN 'hostauth'
+		WHEN upper(IFNULL(method,'')) = 'LOGIN' THEN 'applogin'
+		ELSE 'web'
+	END WHERE IFNULL(kind,'') = ''`)
+	_, _ = s.db.Exec(`UPDATE alerts SET user = evidence
+		WHERE IFNULL(user,'') = '' AND kind = 'hostauth'
+		AND IFNULL(evidence,'') != '' AND evidence NOT LIKE '% %' AND length(evidence) < 40`)
+}
+
+const alertCols = `id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source,
+		COALESCE(country,''), COALESCE(country_name,''), COALESCE(lat,0), COALESCE(lon,0), COALESCE(tags,''), COALESCE(num,0),
+		COALESCE(kind,''), COALESCE(user,''), COALESCE(outcome,''), COALESCE(path,''), COALESCE(host,''), COALESCE(reason,'')`
+
+func scanAlert(sc interface{ Scan(dest ...any) error }) (event.Alert, error) {
+	var a event.Alert
+	var ts int64
+	var mitre, tags string
+	err := sc.Scan(&a.ID, &ts, &a.EventID, &a.RuleID, &a.Title, &a.Severity, &a.Category,
+		&a.SrcIP, &a.Method, &a.URL, &a.Status, &a.UA, &a.Evidence, &mitre, &a.Count, &a.Source,
+		&a.Country, &a.CountryName, &a.Lat, &a.Lon, &tags, &a.Num,
+		&a.Kind, &a.User, &a.Outcome, &a.Path, &a.Host, &a.Reason)
+	if err != nil {
+		return a, err
+	}
+	a.Time = time.UnixMilli(ts).UTC()
+	a.HasGeo = a.Country != "" && (a.Lat != 0 || a.Lon != 0)
+	_ = json.Unmarshal([]byte(mitre), &a.MITRE)
+	_ = json.Unmarshal([]byte(tags), &a.Tags)
+	if a.Kind == "" {
+		a.Kind = inferAlertKind(a)
+	}
+	return a, nil
+}
+
+func inferAlertKind(a event.Alert) string {
+	switch a.Category {
+	case "hostauth":
+		return event.KindHostAuth
+	case "applogin":
+		return event.KindAppLogin
+	case "tenant":
+		return event.KindTenantLogin
+	case "canary", "authz", "secprobe", "tamper":
+		return event.KindSecProbe
+	}
+	switch strings.ToUpper(a.Method) {
+	case "SSH", "SUDO":
+		return event.KindHostAuth
+	case "LOGIN":
+		return event.KindAppLogin
+	}
+	return event.KindWeb
 }
 
 func (s *Store) nextAlertNum() (int64, error) {
@@ -179,11 +261,12 @@ func (s *Store) InsertAlert(al *event.Alert) error {
 	mitre, _ := json.Marshal(al.MITRE)
 	tags, _ := json.Marshal(al.Tags)
 	_, err := s.db.Exec(`INSERT OR REPLACE INTO alerts
-		(id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source, country, country_name, lat, lon, tags, num)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		(id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source, country, country_name, lat, lon, tags, num, kind, user, outcome, path, host, reason)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		al.ID, al.Time.UnixMilli(), al.EventID, al.RuleID, al.Title, al.Severity, al.Category,
 		al.SrcIP, al.Method, al.URL, al.Status, al.UA, al.Evidence, string(mitre), al.Count, al.Source,
-		al.Country, al.CountryName, al.Lat, al.Lon, string(tags), al.Num)
+		al.Country, al.CountryName, al.Lat, al.Lon, string(tags), al.Num,
+		al.Kind, al.User, al.Outcome, al.Path, al.Host, al.Reason)
 	if err != nil {
 		return err
 	}
@@ -271,27 +354,17 @@ func (s *Store) Alerts(q AlertQuery) (event.AlertPage, error) {
 	if q.AfterNum > 0 {
 		order = "ORDER BY num ASC"
 	}
-	rows, err := s.db.Query(`SELECT id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source,
-		COALESCE(country,''), COALESCE(country_name,''), COALESCE(lat,0), COALESCE(lon,0), COALESCE(tags,''), COALESCE(num,0)
-		FROM alerts `+where+` `+order+` LIMIT ?`, args...)
+	rows, err := s.db.Query(`SELECT `+alertCols+` FROM alerts `+where+` `+order+` LIMIT ?`, args...)
 	if err != nil {
 		return event.AlertPage{}, err
 	}
 	defer rows.Close()
 	var out []event.Alert
 	for rows.Next() {
-		var a event.Alert
-		var ts int64
-		var mitre, tags string
-		if err := rows.Scan(&a.ID, &ts, &a.EventID, &a.RuleID, &a.Title, &a.Severity, &a.Category,
-			&a.SrcIP, &a.Method, &a.URL, &a.Status, &a.UA, &a.Evidence, &mitre, &a.Count, &a.Source,
-			&a.Country, &a.CountryName, &a.Lat, &a.Lon, &tags, &a.Num); err != nil {
+		a, err := scanAlert(rows)
+		if err != nil {
 			return event.AlertPage{}, err
 		}
-		a.Time = time.UnixMilli(ts).UTC()
-		a.HasGeo = a.Country != "" && (a.Lat != 0 || a.Lon != 0)
-		_ = json.Unmarshal([]byte(mitre), &a.MITRE)
-		_ = json.Unmarshal([]byte(tags), &a.Tags)
 		out = append(out, a)
 	}
 	if out == nil {

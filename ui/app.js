@@ -2,7 +2,7 @@ const $ = (s, r = document) => r.querySelector(s);
 
 let severity = "all";
 let plane = "";
-try { plane = localStorage.getItem("gpesiem.plane") || ""; } catch (_) {}
+try { plane = localStorage.getItem("gwd.plane") || ""; } catch (_) {}
 let query = "";
 let seen = new Set();
 
@@ -125,7 +125,7 @@ const HOME_PALETTE = ["#d4a054", "#5b9fd4", "#6b9e7a", "#c47ad4", "#e07a2f", "#3
 
 let lastAlerts = [];
 let selectedSource = "";
-try { selectedSource = localStorage.getItem("gpesiem.source") || ""; } catch (_) {}
+try { selectedSource = localStorage.getItem("gwd.source") || ""; } catch (_) {}
 let sourceList = [];
 
 /* Calibrated to ui/map-basemap.jpg. NA is drawn a bit south of true
@@ -262,6 +262,9 @@ const COUNTRY_ICON = {
   nl: "countries/nl.svg", ru: "countries/ru.svg", ch: "countries/ch.svg",
   us: "countries/us.svg", ca: "countries/ca.svg",
   eg: "countries/eg.svg", sg: "countries/sg.svg",
+  gb: "countries/gb.svg", mx: "countries/mx.svg",
+  im: "countries/im.svg", hk: "countries/hk.svg",
+  ve: "countries/ve.svg", in: "countries/in.svg",
 };
 const COUNTRY_ALIAS = {
   "united states": "us", usa: "us", america: "us",
@@ -270,6 +273,9 @@ const COUNTRY_ALIAS = {
   indonesia: "id", ireland: "ie", malaysia: "my", russia: "ru",
   andorra: "ad", liberia: "lr", "dominican republic": "do",
   canada: "ca", egypt: "eg", singapore: "sg",
+  "united kingdom": "gb", uk: "gb", britain: "gb", "great britain": "gb",
+  mexico: "mx", "isle of man": "im", "hong kong": "hk",
+  venezuela: "ve", india: "in",
 };
 
 const ICONS = {};
@@ -759,7 +765,9 @@ function renderAlerts() {
     $("#feed-meta").textContent = "0 shown";
     return;
   }
-  const more = alertHasMore ? `<div class="empty" id="alert-more">Scroll for older…</div>` : "";
+  const more = alertHasMore
+    ? `<button type="button" class="btn-quiet load-older" id="alert-more">Load older</button>`
+    : "";
   box.innerHTML = shown.map(a => `
     <div class="row" data-id="${esc(a.id)}">
       <div class="anum">${a.num ? "#" + a.num : ""}</div>
@@ -831,52 +839,292 @@ function renderAttackers(list) {
       <div class="when">${a.alerts}</div>
     </div>`).join("");
   box.querySelectorAll(".att").forEach(el => {
-    el.addEventListener("click", () => {
-      query = el.dataset.ip;
-      $("#q").value = query;
-      refresh();
-    });
+    el.addEventListener("click", () => openIntel(el.dataset.ip));
   });
 }
 
-function openDetail(a) {
+async function openIntel(ip) {
+  if (!ip) return;
+  const d = $("#detail");
+  if (!d) return;
+  d.querySelector("article").innerHTML = `<h3 class="mono">${esc(ip)}</h3><section class="intel-box" id="detail-intel"></section>`;
+  d.showModal();
+  await loadIntel(ip, d.querySelector("#detail-intel"));
+}
+
+const IP_LOOKUPS = [
+  { name: "AbuseIPDB", href: ip => "https://www.abuseipdb.com/check/" + ip, primary: true },
+  { name: "GreyNoise", href: ip => "https://viz.greynoise.io/ip/" + ip, primary: true },
+  { name: "VirusTotal", href: ip => "https://www.virustotal.com/gui/ip-address/" + ip, primary: true },
+  { name: "Talos", href: ip => "https://www.talosintelligence.com/reputation_center/lookup?search=" + ip, primary: true },
+  { name: "IPOK", href: ip => "https://ipok.io/en?ip=" + ip },
+  { name: "IPQS", href: ip => "https://www.ipqualityscore.com/free-ip-lookup-proxy-vpn-test/lookup/" + ip },
+  { name: "OTX", href: ip => "https://otx.alienvault.com/indicator/ip/" + ip },
+  { name: "X-Force", href: ip => "https://exchange.xforce.ibmcloud.com/ip/" + ip },
+  { name: "Shodan", href: ip => "https://www.shodan.io/host/" + ip },
+  { name: "MXToolbox", href: ip => "https://mxtoolbox.com/SuperTool.aspx?action=blacklist%3a" + ip },
+  { name: "Spamhaus", href: ip => "https://check.spamhaus.org/listed/?searchterm=" + ip },
+  { name: "Honey Pot", href: ip => "https://www.projecthoneypot.org/ip_" + ip },
+  { name: "IPinfo", href: ip => "https://ipinfo.io/" + ip },
+  { name: "Pulsedive", href: ip => "https://pulsedive.com/indicator/?ioc=" + ip },
+];
+
+function lookupLinks(ip, all) {
+  const list = all ? IP_LOOKUPS : IP_LOOKUPS.filter(x => x.primary);
+  return list.map(x => `<a class="intel-link" href="${esc(x.href(ip))}" target="_blank" rel="noopener noreferrer">${esc(x.name)}</a>`).join("");
+}
+
+function openLookups(ip) {
+  IP_LOOKUPS.filter(x => x.primary).forEach((x, i) => {
+    setTimeout(() => window.open(x.href(ip), "_blank", "noopener"), i * 180);
+  });
+}
+
+function researchLine(intel) {
+  const r = intel.research || "local";
+  if (r === "off") return "Research trickle is off (no ABUSEIPDB_KEY). Our logs + these tabs only.";
+  if (r === "queued") return "In the slow queue — one check ~every 90s, cached. We do not hammer free APIs.";
+  if (r === "cached" && intel.ext_source) {
+    return intel.ext_source + " cached" + (intel.ext_score != null ? " · confidence " + intel.ext_score : "") +
+      (intel.ext_note ? " · " + intel.ext_note : "");
+  }
+  if (r === "stale") return "Cached lookup expired — queued for a polite recheck.";
+  return "Our logs only so far. Open the tabs for third-party context.";
+}
+
+function paintIntelBox(el, intel) {
+  if (!el) return;
+  const v = intel.verdict || "unknown";
+  const why = (intel.why || []).map(w => `<li>${esc(w)}</li>`).join("");
+  const hosts = (intel.hosts || []).join(", ") || "—";
+  const cats = (intel.categories || []).map(c => CAT_LABEL[c] || c).join(", ") || "—";
+  const users = (intel.users || []).map(u => esc(u.name) + " ×" + u.count).join(", ");
+  el.innerHTML = `
+    <div class="intel-head">
+      <span class="intel-score ${esc(v)}">${intel.weight ?? 0}</span>
+      <div>
+        <div class="intel-verdict">${esc(v)} · ${esc(intel.intent || "")}</div>
+        <div class="muted">${esc(researchLine(intel))}</div>
+      </div>
+    </div>
+    <ul class="intel-why">${why || "<li>no extra notes</li>"}</ul>
+    <div class="muted">Hosts: ${esc(hosts)} · Types: ${esc(cats)}${users ? " · Users tried: " + users : ""}</div>
+    <div class="intel-links">${intel.private ? "<span class='muted'>private IP — no public lookups</span>" : lookupLinks(intel.src_ip, true)}</div>
+    ${intel.private ? "" : `<button type="button" class="intel-open" data-open-lookups="${esc(intel.src_ip)}">Open top 4 lookups</button>`}
+  `;
+}
+
+async function loadIntel(ip, box) {
+  if (!box || !ip) return;
+  box.innerHTML = `<div class="muted">weighing ${esc(ip)} from our logs…</div>`;
+  try {
+    const intel = await j("/api/intel?ip=" + encodeURIComponent(ip) + "&since=168h");
+    paintIntelBox(box, intel);
+  } catch (err) {
+    box.innerHTML = `<div class="muted">${esc(err.message || "intel failed")}</div>`;
+  }
+}
+
+function alertKind(a) {
+  if (a.kind) return a.kind;
+  if (a.category === "hostauth" || /^(SSH|SUDO)$/i.test(a.method || "")) return "hostauth";
+  if (a.category === "applogin") return "applogin";
+  if (a.category === "tenant") return "tenantlogin";
+  if (["canary", "authz", "secprobe", "tamper"].includes(a.category)) return "secprobe";
+  if (/^LOGIN$/i.test(a.method || "")) return "applogin";
+  return "web";
+}
+
+function alertUser(a) {
+  if (a.user) return a.user;
+  const ev = String(a.evidence || "").trim();
+  if (ev && ev.length < 40 && !/[\s\/?=]/.test(ev)) return ev;
+  const m = String(a.url || "").match(/\bfor (\S+) from\b/i);
+  return m ? m[1] : "";
+}
+
+function alertOutcome(a) {
+  const o = String(a.outcome || "").toLowerCase();
+  if (o === "ok") return "accepted";
+  if (o === "fail") return "failed";
+  const u = String(a.url || "");
+  if (/accepted/i.test(u)) return "accepted";
+  if (/failed password|invalid user|authentication failure|max auth/i.test(u)) return "failed";
+  if (a.status === 401 || a.status === 403) return "failed";
+  if (a.status === 200 || a.status === 201 || a.status === 204) return "accepted";
+  return "";
+}
+
+function alertWhat(a) {
+  const kind = alertKind(a);
+  const url = String(a.url || "").replace(/^(SSH|SUDO|LOGIN)\s+/i, "").trim();
+  if (kind === "hostauth") {
+    if (/invalid user/i.test(url)) return "invalid user";
+    if (/failed password/i.test(url)) return "failed password";
+    if (/accepted/i.test(url)) return "accepted login";
+    if (/max auth/i.test(url)) return "max auth failures";
+    if (/sudo/i.test(url) || /^SUDO$/i.test(a.method || "")) return "sudo failure";
+    return url || a.title || "";
+  }
+  if (kind === "applogin" || kind === "tenantlogin") {
+    return (a.path || url || "/login").trim();
+  }
+  if (kind === "secprobe") {
+    return a.reason ? a.reason.replace(/_/g, " ") : (a.path || url || a.title || "");
+  }
+  if (a.method && (a.path || url)) return a.method + " " + (a.path || url);
+  return url || a.title || "";
+}
+
+function detailRows(a) {
+  const kind = alertKind(a);
+  const user = alertUser(a);
+  const outcome = alertOutcome(a);
+  const what = alertWhat(a);
+  const rows = [];
+  const add = (k, v) => {
+    if (v == null) return;
+    const s = String(v).trim();
+    if (!s || s === "—" || s === "0") return;
+    rows.push([k, s]);
+  };
+  add("User tried", user);
+  if (kind === "hostauth" || kind === "applogin" || kind === "tenantlogin") {
+    add("Result", outcome);
+    add("What", what && what !== a.title ? what : "");
+  } else if (kind === "secprobe") {
+    add("Reason", a.reason ? a.reason.replace(/_/g, " ") : "");
+    add("Path", a.path || a.url || "");
+    if (a.status) add("HTTP status", String(a.status));
+  } else {
+    add("Request", what);
+    if (a.status) add("HTTP status", String(a.status));
+    add("User-Agent", a.ua);
+  }
+  add("From", a.src_ip);
+  add("Against", a.source);
+  if (kind === "web" && a.host && a.host !== a.source) add("Host header", a.host);
+  add("Rule", a.rule_id);
+  add("MITRE", (a.mitre || []).join(", "));
+  if (a.count > 1) add("Count", String(a.count));
+  add("Tags", (a.tags || []).join(", "));
+  return rows;
+}
+
+async function openDetail(a) {
+  lastDetail = a;
+  if (isAdmin()) {
+    try { await loadPairing(); } catch (_) {}
+  }
   const d = $("#detail");
   const originName = a.country_name || a.country || "";
   const originSrc = countryArt(a.country, a.country_name);
   const catSrc = typeArt(a.category);
   const hostSrc = a.source ? hostArt(a.source) : "";
   const regionSrc = a.source ? hostRegionArt(a.source) : "";
+  const iso = (a.country || "").toString().trim().toUpperCase();
   const tile = (src, cap, extra) => {
     if (!src && !cap) return "";
+    const mark = src
+      ? artImg(src, "detail-svg", cap)
+      : `<span class="detail-fallback">${esc(iso && cap === originName ? iso : String(cap || "?").slice(0, 3))}</span>`;
     return `<div class="detail-art">
-      ${artImg(src, "detail-svg", cap)}
+      ${mark}
       ${extra ? artImg(extra, "detail-svg sub", cap) : ""}
       <span class="cap">${esc(cap || "—")}</span>
     </div>`;
   };
+  const rows = detailRows(a).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+  const kicker = [
+    a.num ? "#" + a.num : "",
+    a.severity || "",
+    CAT_LABEL[a.category] || a.category || "",
+  ].filter(Boolean).join(" · ");
   d.querySelector("article").innerHTML = `
     <div class="detail-hero">
       ${tile(originSrc, originName || (a.src_ip || "origin"))}
       ${tile(catSrc, CAT_LABEL[a.category] || a.category || "event")}
       ${tile(hostSrc, a.source || "host", regionSrc)}
     </div>
+    <div class="detail-kicker">${esc(kicker)}</div>
     <h3>${esc(a.title)}</h3>
-    <dl>
-      <dt>Number</dt><dd>${a.num ? "#" + a.num : "—"}</dd>
-      <dt>Severity</dt><dd>${esc(a.severity)} · ${esc(a.category)}</dd>
-      <dt>Tags</dt><dd>${esc((a.tags || []).join(", ") || "—")}</dd>
-      <dt>When</dt><dd>${esc(a.time)}</dd>
-      <dt>Source IP</dt><dd>${esc(a.src_ip)}</dd>
-      <dt>Country</dt><dd>${esc(originName || "—")}</dd>
-      <dt>Request</dt><dd>${esc(a.method)} ${esc(a.url)}</dd>
-      <dt>Status</dt><dd>${esc(a.status)}</dd>
-      <dt>Rule</dt><dd>${esc(a.rule_id)}</dd>
-      <dt>Evidence</dt><dd>${esc(a.evidence)}</dd>
-      <dt>User-Agent</dt><dd>${esc(a.ua)}</dd>
-      <dt>MITRE</dt><dd>${esc((a.mitre || []).join(", ") || "—")}</dd>
-      <dt>Host / src</dt><dd>${esc(a.source || "—")}</dd>
-    </dl>`;
+    <p class="detail-when">${esc(fmtWhen(a.time))}${a.time ? " · " + ago(a.time) + " ago" : ""}</p>
+    ${rows ? `<dl>${rows}</dl>` : ""}
+    ${blockPanel(a)}
+    <section class="intel-box" id="detail-intel"></section>`;
   d.showModal();
+  if (a.src_ip) loadIntel(a.src_ip, d.querySelector("#detail-intel"));
+}
+
+let agentCache = [];
+
+function pairedAgent(source) {
+  return (agentCache || []).find(x => x.name === source && x.status === "active");
+}
+
+function durBtns(ip, agentId, all) {
+  return ["15m", "1h", "24h", "7d"].map(d => {
+    if (all) return `<button type="button" class="btn-quiet" data-ban-all="${esc(ip)}" data-ban-dur="${d}">${d}</button>`;
+    return `<button type="button" class="btn-quiet" data-ban-host="${esc(agentId)}" data-ban-ip="${esc(ip)}" data-ban-dur="${d}">${d}</button>`;
+  }).join("");
+}
+
+function blockPanel(a) {
+  if (!isAdmin() || !a.src_ip) return "";
+  const host = pairedAgent(a.source);
+  const pairedN = (agentCache || []).filter(x => x.status === "active").length;
+  const thisRow = host
+    ? `<div class="ban-row">
+        <div><b>This host</b><div class="muted">${esc(a.source)}</div></div>
+        <div class="row-btns">${durBtns(a.src_ip, host.id, false)}</div>
+      </div>`
+    : `<div class="ban-row">
+        <div><b>This host</b><div class="muted">${esc(a.source || "—")} is not paired</div></div>
+        <a class="btn-quiet" href="#pair-block" id="ban-goto-pair">Pair in Settings</a>
+      </div>`;
+  const allRow = pairedN
+    ? `<div class="ban-row">
+        <div><b>All paired</b><div class="muted">${pairedN} host${pairedN === 1 ? "" : "s"}</div></div>
+        <div class="row-btns">${durBtns(a.src_ip, "", true)}</div>
+      </div>`
+    : "";
+  return `<section class="detail-block">
+    <div class="intel-verdict">Contain</div>
+    <div class="muted">Block <span class="mono">${esc(a.src_ip)}</span> — public IPs only. The sensor applies it on the next poll. <a href="#" data-goto-blocks>Blocklist</a></div>
+    ${thisRow}
+    ${allRow}
+    <div class="muted" id="ban-status"></div>
+  </section>`;
+}
+
+let lastDetail = null;
+
+async function doBan(ip, agentId, duration, all) {
+  const status = $("#ban-status");
+  const dur = duration || "1h";
+  const msg = all
+    ? `Block ${ip} on every paired host for ${dur}?`
+    : `Block ${ip} on this host for ${dur}?`;
+  if (!confirm(msg)) return;
+  try {
+    const url = all ? "/api/agents/ban-all" : "/api/agents/" + encodeURIComponent(agentId) + "/ban";
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ip, duration: dur,
+        title: lastDetail && lastDetail.title || "",
+        category: lastDetail && lastDetail.category || "",
+        num: lastDetail && lastDetail.num || 0,
+        scope: all ? "all" : "this",
+      }),
+    });
+    const t = await r.text();
+    if (!r.ok) throw new Error(t.trim() || r.statusText);
+    if (status) status.textContent = "queued — the sensor applies it on its next poll";
+  } catch (err) {
+    if (status) status.textContent = err.message || "ban failed";
+  }
 }
 
 function hostQS(extra) {
@@ -981,7 +1229,7 @@ if (planeFilters) {
     const b = e.target.closest("button");
     if (!b) return;
     plane = b.dataset.plane || "";
-    try { localStorage.setItem("gpesiem.plane", plane); } catch (_) {}
+    try { localStorage.setItem("gwd.plane", plane); } catch (_) {}
     planeFilters.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
     alertBuf = [];
     loadAlerts("reset").catch(console.error);
@@ -1003,7 +1251,7 @@ const hostSel = $("#host");
 if (hostSel) {
   hostSel.addEventListener("change", () => {
     selectedSource = hostSel.value;
-    try { localStorage.setItem("gpesiem.source", selectedSource); } catch (_) {}
+    try { localStorage.setItem("gwd.source", selectedSource); } catch (_) {}
     alertBuf = [];
     if (selectedSource) fitHomes();
     else { mapCam.z = 1; mapCam.x = 0; mapCam.y = 0; }
@@ -1021,6 +1269,10 @@ const alertBox = $("#alerts");
 if (alertBox && !alertBox.dataset.bound) {
   alertBox.dataset.bound = "1";
   alertBox.addEventListener("click", (e) => {
+    if (e.target.closest("#alert-more")) {
+      loadAlerts("older").catch(console.error);
+      return;
+    }
     const row = e.target.closest(".row");
     if (!row) return;
     const a = alertBuf.find(x => x.id === row.dataset.id);
@@ -1110,8 +1362,41 @@ if (mapReset) mapReset.addEventListener("click", () => { mapCam.z = 1; mapCam.x 
 
 document.addEventListener("click", (e) => {
   const b = e.target.closest("#map-key .key");
-  if (!b) return;
-  toggleCat(b.dataset.cat || "");
+  if (b) { toggleCat(b.dataset.cat || ""); return; }
+  const open = e.target.closest("[data-open-lookups]");
+  if (open) { openLookups(open.dataset.openLookups); return; }
+  const weigh = e.target.closest("[data-intel-ip]");
+  if (weigh) { openIntel(weigh.dataset.intelIp); return; }
+  const banHost = e.target.closest("[data-ban-host]");
+  if (banHost) {
+    doBan(banHost.dataset.banIp, banHost.dataset.banHost, banHost.dataset.banDur || "1h", false);
+    return;
+  }
+  const banAll = e.target.closest("[data-ban-all]");
+  if (banAll) {
+    doBan(banAll.dataset.banAll, "", banAll.dataset.banDur || "1h", true);
+    return;
+  }
+  const goPair = e.target.closest("#ban-goto-pair");
+  if (goPair) {
+    e.preventDefault();
+    const dlg = $("#detail");
+    if (dlg) dlg.close();
+    setView("settings");
+    const el = $("#pair-block");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  const goBlocks = e.target.closest("[data-goto-blocks]");
+  if (goBlocks) {
+    e.preventDefault();
+    const dlg = $("#detail");
+    if (dlg) dlg.close();
+    reportKind = "blocks";
+    try { localStorage.setItem("gwd.report", reportKind); } catch (_) {}
+    setView("reports");
+    refreshReports().catch(console.error);
+  }
 });
 
 let currentView = "live";
@@ -1160,22 +1445,24 @@ function paintReportWindow(rep) {
   el.textContent = msg;
 }
 try {
-  currentView = localStorage.getItem("gpesiem.view") || "live";
-  reportKind = localStorage.getItem("gpesiem.report") || "vectors";
-  reportRange = localStorage.getItem("gpesiem.range") || "24h";
+  currentView = localStorage.getItem("gwd.view") || "live";
+  reportKind = localStorage.getItem("gwd.report") || "vectors";
+  reportRange = localStorage.getItem("gwd.range") || "24h";
 } catch (_) {}
 
 function setView(v) {
-  currentView = (v === "reports" || v === "settings" || v === "search") ? v : "live";
-  try { localStorage.setItem("gpesiem.view", currentView); } catch (_) {}
+  currentView = (v === "reports" || v === "settings" || v === "search" || v === "status") ? v : "live";
+  try { localStorage.setItem("gwd.view", currentView); } catch (_) {}
   const live = $("#view-live");
   const reps = $("#view-reports");
   const sets = $("#view-settings");
   const sea = $("#view-search");
+  const sta = $("#view-status");
   if (live) live.hidden = currentView !== "live";
   if (reps) reps.hidden = currentView !== "reports";
   if (sets) sets.hidden = currentView !== "settings";
   if (sea) sea.hidden = currentView !== "search";
+  if (sta) sta.hidden = currentView !== "status";
   document.querySelectorAll("#view-tabs [data-view]").forEach(b => {
     b.classList.toggle("on", b.dataset.view === currentView);
   });
@@ -1183,6 +1470,101 @@ function setView(v) {
   if (currentView === "settings") {
     loadSettings().catch(console.error);
     loadUsers().catch(() => {});
+  }
+  if (currentView === "status") loadStatus().catch(console.error);
+}
+
+function bytesHuman(n) {
+  n = Number(n) || 0;
+  if (!n) return "—";
+  if (n >= 1e12) return (n / 1e12).toFixed(1) + " TB";
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + " GB";
+  if (n >= 1e6) return (n / 1e6).toFixed(0) + " MB";
+  return n + " B";
+}
+
+function pctBar(n) {
+  const v = Math.max(0, Math.min(100, Number(n) || 0));
+  const cls = v >= 90 ? "hot" : v >= 75 ? "warn" : "";
+  return `<div class="status-bar ${cls}"><i style="width:${v}%"></i></div>`;
+}
+
+function sparkSeries(hist, key, maxHint) {
+  if (!hist || hist.length < 2) return "";
+  const vals = hist.map(p => Number(p[key]) || 0);
+  const max = maxHint || Math.max(1, ...vals);
+  return `<div class="status-spark">${vals.map(v => {
+    const h = Math.max(4, Math.round((v / Math.max(max, 1)) * 100));
+    return `<i style="height:${h}%" title="${v}"></i>`;
+  }).join("")}</div>`;
+}
+
+function uptimeHuman(s) {
+  s = Number(s) || 0;
+  if (!s) return "—";
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600);
+  return d ? d + "d " + h + "h" : h + "h " + Math.floor((s % 3600) / 60) + "m";
+}
+
+async function loadStatus() {
+  const grid = $("#status-grid");
+  if (!grid) return;
+  const allBtn = $("#status-check-all");
+  if (allBtn) allBtn.hidden = !isAdmin();
+  const data = await j("/api/status");
+  const hosts = data.hosts || [];
+  if (!hosts.length) {
+    grid.innerHTML = `<div class="empty">No hosts yet. Pair a sensor in Settings, or Check the manager.</div>`;
+    return;
+  }
+  grid.innerHTML = hosts.map(h => {
+    const snap = h.snapshot;
+    const check = h.checked ? ago(h.checked) + " ago" : "never checked";
+    const btn = isAdmin() ? `<button type="button" class="btn-quiet" data-check="${esc(h.id)}">Check now</button>` : "";
+    if (!h.paired && h.id !== "local") {
+      return `<article class="status-card"><h3>${esc(h.name)}</h3><div class="muted">not paired — pair in Settings to collect specs</div></article>`;
+    }
+    if (!snap) {
+      return `<article class="status-card"><h3>${esc(h.name)}</h3><div class="muted">${esc(h.status || "")} · ${esc(check)}</div><div class="muted">no snapshot yet — click Check now</div>${btn}</article>`;
+    }
+    const hist = h.history || [];
+    const loadMax = Math.max(1, snap.cpu_count || 1, ...hist.map(p => Number(p.load1) || 0));
+    const charts = hist.length > 1 ? `<div class="status-charts">
+      <div><span class="muted">Memory</span>${sparkSeries(hist, "mem_pct", 100)}</div>
+      <div><span class="muted">Disk</span>${sparkSeries(hist, "disk_pct", 100)}</div>
+      <div><span class="muted">Load</span>${sparkSeries(hist, "load1", loadMax)}</div>
+    </div>` : `<div class="muted">Check again later to build a usage chart from your snapshots.</div>`;
+    const disks = (snap.disks || []).map(d =>
+      `<div class="muted">${esc(d.path)} · ${d.pct}% used · ${bytesHuman(d.free)} free of ${bytesHuman(d.total)}</div>${pctBar(d.pct)}`
+    ).join("");
+    const swap = snap.swap_total
+      ? `<div class="muted">Swap ${snap.swap_pct || 0}% · ${bytesHuman(snap.swap_used)} of ${bytesHuman(snap.swap_total)}</div>${pctBar(snap.swap_pct)}`
+      : "";
+    const load = (snap.load1 || snap.load5 || snap.load15)
+      ? `<div class="muted">Load ${Number(snap.load1 || 0).toFixed(2)} / ${Number(snap.load5 || 0).toFixed(2)} / ${Number(snap.load15 || 0).toFixed(2)}</div>`
+      : "";
+    const ver = snap.version ? ` · ${esc(snap.version)}` : "";
+    return `<article class="status-card">
+      <h3>${esc(h.name)}</h3>
+      <div class="muted">${esc(snap.hostname || "")} · ${esc(snap.os)}/${esc(snap.arch)} · ${snap.cpu_count || "?"} CPU · up ${uptimeHuman(snap.uptime_sec)}${ver}</div>
+      <div class="muted">last check ${esc(check)}</div>
+      <div>Memory ${snap.mem_pct || 0}% · ${bytesHuman(snap.mem_avail)} available of ${bytesHuman(snap.mem_total)}</div>
+      ${pctBar(snap.mem_pct)}
+      ${swap}${load}${disks}${charts}${btn}
+    </article>`;
+  }).join("");
+}
+
+async function requestCheck(id) {
+  const note = $("#status-note");
+  try {
+    if (id === "all") await j("/api/agents/check-all", { method: "POST" });
+    else await j("/api/agents/" + encodeURIComponent(id) + "/check", { method: "POST" });
+    if (note) note.textContent = "check sent — results land in a few seconds";
+    setTimeout(() => loadStatus().catch(() => {}), 4000);
+    setTimeout(() => loadStatus().catch(() => {}), 10000);
+  } catch (err) {
+    if (note) note.textContent = err.message || "check failed";
   }
 }
 
@@ -1240,10 +1622,17 @@ function applyRoleChrome() {
   }
   if (add) add.hidden = viewer;
   if (users) users.hidden = viewer;
+  const pair = $("#pair-block");
+  if (pair) {
+    const controls = pair.querySelectorAll("#pair-phrase-form, #pair-mint, #pair-phrase-wrap");
+    controls.forEach(el => { el.hidden = viewer; });
+  }
   const intro = form && form.querySelector(".settings-intro p");
   if (intro && viewer) {
     intro.textContent = "View only. An admin can change pins, retention, and operators.";
   }
+  const checkAll = $("#status-check-all");
+  if (checkAll) checkAll.hidden = viewer;
 }
 
 function collectHomes() {
@@ -1293,6 +1682,91 @@ async function loadSettings() {
     document.title = st.site_name + " — Web Attack Monitor";
   }
   applyRoleChrome();
+  loadPairing().catch(() => {});
+}
+
+async function loadPairing() {
+  const body = $("#agents-body");
+  const stEl = $("#pair-phrase-status");
+  try {
+    const st = await j("/api/pair-status");
+    if (stEl && st.phrase_set) stEl.textContent = "phrase is set";
+    agentCache = await j("/api/agents") || [];
+  } catch (_) {
+    agentCache = [];
+    return;
+  }
+  if (!body) return;
+  if (!agentCache.length) {
+    body.innerHTML = `<tr><td colspan="5" class="empty">No paired hosts yet.</td></tr>`;
+    return;
+  }
+  const admin = isAdmin();
+  body.innerHTML = agentCache.map(a => {
+    const seen = a.last_seen ? ago(a.last_seen) + " ago" : (a.seen_ip || "—");
+    const acts = [];
+    if (admin && a.status === "pending") {
+      acts.push(`<button type="button" class="btn-quiet" data-agent-act="approve" data-id="${esc(a.id)}">Approve</button>`);
+      acts.push(`<button type="button" class="btn-quiet" data-agent-act="reject" data-id="${esc(a.id)}">Reject</button>`);
+    }
+    if (admin && a.status === "active") {
+      acts.push(`<button type="button" class="btn-quiet" data-agent-act="revoke" data-id="${esc(a.id)}">Revoke</button>`);
+    }
+    return `<tr>
+      <td class="mono">${esc(a.name)}<div class="muted">${esc(a.fingerprint || "")}${a.hostname ? " · " + esc(a.hostname) : ""}</div></td>
+      <td class="st-${esc(a.status)}">${esc(a.status)}</td>
+      <td class="muted">${esc(a.seen_ip || "")} ${esc(seen)}</td>
+      <td class="muted">${esc(a.block || "—")}</td>
+      <td class="user-actions">${acts.join("")}</td>
+    </tr>`;
+  }).join("");
+}
+
+async function savePairPhrase(ev) {
+  ev.preventDefault();
+  const status = $("#pair-phrase-status");
+  const phrase = ($("#pair-phrase") || {}).value || "";
+  try {
+    const r = await fetch("/api/pair-phrase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phrase }),
+    });
+    const t = await r.text();
+    if (!r.ok) throw new Error(t.trim() || r.statusText);
+    if (status) status.textContent = "phrase saved — it is never shown again";
+    const inp = $("#pair-phrase");
+    if (inp) inp.value = "";
+  } catch (err) {
+    if (status) status.textContent = err.message || "failed";
+  }
+}
+
+async function mintPairCode() {
+  const box = $("#pair-code-box");
+  const status = $("#pair-mint-status");
+  try {
+    const r = await fetch("/api/pair-codes", { method: "POST" });
+    const t = await r.text();
+    if (!r.ok) throw new Error(t.trim() || r.statusText);
+    const data = JSON.parse(t);
+    if (box) {
+      box.hidden = false;
+      box.innerHTML = `On the host, as root:<br><code>gpewebdefender pair --url https://YOUR-MONITOR --name HOST --code ${esc(data.code)} --block fail2ban</code>
+        <div class="pair-code">${esc(data.code)}</div>
+        One-time. Expires in 15 minutes. The host will also ask for the enrollment phrase. Then Approve the fingerprint below.`;
+    }
+    if (status) status.textContent = "code minted";
+  } catch (err) {
+    if (status) status.textContent = err.message || "failed";
+  }
+}
+
+async function agentAct(id, act) {
+  if (act === "revoke" && !confirm("Revoke this host? It will stop taking block orders.")) return;
+  const r = await fetch("/api/agents/" + encodeURIComponent(id) + "/" + act, { method: "POST" });
+  if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+  await loadPairing();
 }
 
 async function saveSettings(ev) {
@@ -1592,6 +2066,62 @@ function renderAuthReport(rep, kind) {
       : `<div class="empty">None</div>`, "span2");
 }
 
+function leftLabel(until, active) {
+  if (!active) return "ended";
+  if (!until) return "until you unban";
+  const ms = new Date(until).getTime() - Date.now();
+  if (Number.isNaN(ms) || ms <= 0) return "ending";
+  const m = Math.max(1, Math.round(ms / 60000));
+  if (m < 90) return m + "m left";
+  const h = Math.round(m / 60);
+  if (h < 48) return h + "h left";
+  return Math.round(h / 24) + "d left";
+}
+
+function appliedLabel(s) {
+  return { applied: "on the host", failed: "sensor failed", queued: "waiting on sensor" }[s] || (s || "waiting");
+}
+
+function renderBlockReport(rep) {
+  const stats = $("#report-stats");
+  const box = $("#report-body");
+  const n = (rep && rep.active) || 0;
+  const ips = (rep && rep.ips) || 0;
+  stats.innerHTML = `
+    <div class="card"><div class="k">Active bans</div><div class="v">${n}</div></div>
+    <div class="card"><div class="k">IPs</div><div class="v">${ips}</div></div>
+    <div class="card"><div class="k">Applied</div><div class="v">${rep.applied || 0}</div></div>
+    <div class="card"><div class="k">Waiting</div><div class="v">${rep.queued || 0}</div></div>
+    <div class="card"><div class="k">Failed</div><div class="v">${rep.failed || 0}</div></div>
+    <div class="card"><div class="k">Rows</div><div class="v">${(rep.rows || []).length}</div></div>`;
+  const el = $("#report-window");
+  if (el) el.textContent = "current blocklist · one row per host · hits after ban should stay 0 if it is working";
+  const rows = (rep.rows || []).filter(r => r.active);
+  const old = (rep.rows || []).filter(r => !r.active).slice(0, 20);
+  const line = r => {
+    const why = r.title || "—";
+    const num = r.alert_num ? "#" + r.alert_num : "";
+    const scope = r.scope === "all" ? "all paired hosts" : "this host";
+    const hits = r.active ? (r.hits_after ? r.hits_after + " hits after ban" : "no hits since") : "";
+    const unban = r.active && isAdmin()
+      ? `<button type="button" class="btn-quiet" data-unban-host="${esc(r.agent_id)}" data-unban-ip="${esc(r.ip)}">Unban</button>`
+      : "";
+    return `<tr>
+      <td class="mono" data-drill="ip" data-ip="${esc(r.ip)}" style="cursor:pointer">${esc(r.ip)}</td>
+      <td>${esc(r.host || "—")}<div class="muted">${esc(scope)}</div></td>
+      <td>${esc(why)} ${num ? `<span class="muted">${esc(num)}</span>` : ""}<div class="muted">${esc(CAT_LABEL[r.category] || r.category || "")}</div></td>
+      <td>${esc(appliedLabel(r.applied))}<div class="muted">${esc(hits)}</div></td>
+      <td>${esc(leftLabel(r.until, r.active))}<div class="muted">${esc(r.duration || "")} · ${esc(r.created_by || "")}</div></td>
+      <td>${unban}</td>
+    </tr>`;
+  };
+  const table = list => !list.length
+    ? `<div class="empty">None</div>`
+    : `<table class="rpt"><thead><tr><th>IP</th><th>Host</th><th>Blocked for</th><th>Status</th><th>Time left</th><th></th></tr></thead><tbody>${list.map(line).join("")}</tbody></table>`;
+  box.innerHTML = panel("Currently blocked", table(rows), "span2") +
+    panel("Recently ended", table(old), "span2");
+}
+
 async function refreshReports() {
   markReportChrome();
   try {
@@ -1607,6 +2137,10 @@ async function refreshReports() {
   try {
     if (reportKind === "vectors") {
       renderVectorReport(await j("/api/reports/vectors?" + params.toString()));
+      return;
+    }
+    if (reportKind === "blocks") {
+      renderBlockReport(await j("/api/reports/blocks"));
       return;
     }
     params.set("channel", reportKind);
@@ -1630,22 +2164,38 @@ if (reportViews) {
     const b = e.target.closest("button[data-report]");
     if (!b) return;
     reportKind = b.dataset.report;
-    try { localStorage.setItem("gpesiem.report", reportKind); } catch (_) {}
+    try { localStorage.setItem("gwd.report", reportKind); } catch (_) {}
     refreshReports().catch(console.error);
   });
 }
 const reportBody = $("#report-body");
 if (reportBody && !reportBody.dataset.bound) {
   reportBody.dataset.bound = "1";
-  reportBody.addEventListener("click", (e) => {
+  reportBody.addEventListener("click", async (e) => {
     const host = e.target.closest("[data-host]");
     if (host) {
       const name = host.dataset.host;
       if (!name || name === "(none)") return;
       selectedSource = name;
-      try { localStorage.setItem("gpesiem.source", selectedSource); } catch (_) {}
+      try { localStorage.setItem("gwd.source", selectedSource); } catch (_) {}
       fillHostSelect();
       refresh().catch(console.error);
+      return;
+    }
+    const unban = e.target.closest("[data-unban-host]");
+    if (unban) {
+      if (!confirm("Unban " + unban.dataset.unbanIp + " on this host?")) return;
+      try {
+        const r = await fetch("/api/agents/" + encodeURIComponent(unban.dataset.unbanHost) + "/unban", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ip: unban.dataset.unbanIp }),
+        });
+        if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+        refreshReports().catch(console.error);
+      } catch (err) {
+        alert(err.message || "unban failed");
+      }
       return;
     }
     const hit = e.target.closest("[data-drill]");
@@ -1661,6 +2211,17 @@ if (reportBody && !reportBody.dataset.bound) {
   });
 }
 async function downloadExport(format) {
+  if (reportKind === "blocks") {
+    const data = await j("/api/reports/blocks");
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "gwd-blocklist.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  }
   const params = new URLSearchParams({ since: reportRange, format });
   if (selectedSource) params.set("source", selectedSource);
   const path = reportKind === "vectors" ? "/api/export/alerts" : "/api/export/events";
@@ -1673,7 +2234,7 @@ async function downloadExport(format) {
   const m = /filename="([^"]+)"/.exec(cd);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = (m && m[1]) || ("gpesiem-export." + format);
+  a.download = (m && m[1]) || ("gwd-export." + format);
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -1712,13 +2273,13 @@ if (reportRangeEl) {
     const b = e.target.closest("button[data-range]");
     if (!b) return;
     reportRange = b.dataset.range;
-    try { localStorage.setItem("gpesiem.range", reportRange); } catch (_) {}
+    try { localStorage.setItem("gwd.range", reportRange); } catch (_) {}
     refreshReports().catch(console.error);
   });
 }
 
 let searchOldest = false;
-try { searchOldest = localStorage.getItem("gpesiem.searchSort") === "oldest"; } catch (_) {}
+try { searchOldest = localStorage.getItem("gwd.searchSort") === "oldest"; } catch (_) {}
 
 function paintSearchSort() {
   const dir = $("#search-when-dir");
@@ -1776,7 +2337,7 @@ if (searchWhen) {
   paintSearchSort();
   searchWhen.addEventListener("click", () => {
     searchOldest = !searchOldest;
-    try { localStorage.setItem("gpesiem.searchSort", searchOldest ? "oldest" : "newest"); } catch (_) {}
+    try { localStorage.setItem("gwd.searchSort", searchOldest ? "oldest" : "newest"); } catch (_) {}
     paintSearchSort();
     runSearch().catch(console.error);
   });
@@ -1998,18 +2559,35 @@ const setupForm = $("#setup-form");
 if (setupForm) setupForm.addEventListener("submit", createFirstAdmin);
 const usersBody = $("#users-body");
 if (usersBody) usersBody.addEventListener("click", userRowAction);
+const pairPhraseForm = $("#pair-phrase-form");
+if (pairPhraseForm) pairPhraseForm.addEventListener("submit", savePairPhrase);
+const pairMint = $("#pair-mint");
+if (pairMint) pairMint.addEventListener("click", mintPairCode);
+const agentsBody = $("#agents-body");
+if (agentsBody) {
+  agentsBody.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-agent-act]");
+    if (!b) return;
+    agentAct(b.dataset.id, b.dataset.agentAct).catch(err => {
+      const s = $("#pair-mint-status");
+      if (s) s.textContent = err.message || "failed";
+    });
+  });
+}
+const statusCheckAll = $("#status-check-all");
+if (statusCheckAll) statusCheckAll.addEventListener("click", () => requestCheck("all"));
+const statusGrid = $("#status-grid");
+if (statusGrid) {
+  statusGrid.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-check]");
+    if (b) requestCheck(b.dataset.check);
+  });
+}
 const logoutBtn = $("#logout");
 if (logoutBtn) logoutBtn.addEventListener("click", doLogout);
 
 const alertList = $("#alerts");
-if (alertList) {
-  alertList.addEventListener("scroll", () => {
-    if (!alertHasMore || alertLoading) return;
-    if (alertList.scrollTop + alertList.clientHeight > alertList.scrollHeight - 80) {
-      loadAlerts("older").catch(() => {});
-    }
-  });
-}
+
 
 bootAuth().then(() => {
   connect();

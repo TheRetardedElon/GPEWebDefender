@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>21 · Host status — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>21 · Host status</h1>
+        <p class="lead">
+          On demand only. You click <strong>Check</strong>, a box answers once
+          (load, memory, disk, uptime), and a small chart grows from the snapshots
+          you asked for. Nothing is polled in the background.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Added 2026-08-16</span>
+          <span class="pill">Admin to Check</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#what">What it is</a>
+        <a href="#need">What you need</a>
+        <a href="#ui">The Status page</a>
+        <a href="#api">API</a>
+        <a href="#not">What it is not</a>
+      </nav>
+
+      <section class="block" id="what">
+        <h2>What it is</h2>
+        <p>
+          A way to look at the boxes you already monitor when you wonder
+          “is that host tight on disk?” It is not a second product and it is
+          not a replacement for <code>htop</code> or a metrics stack.
+        </p>
+        <table>
+          <thead><tr><th>Host</th><th>How a check works</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Manager (always listed as <code>manager</code>)</td>
+              <td>Immediate. The process reads <code>/proc</code> (or Windows APIs) and stores a snapshot.</td>
+            </tr>
+            <tr>
+              <td>A paired sensor</td>
+              <td>The dashboard queues a <code>stats</code> command. The agent picks it up on its next poll (~4 seconds), posts one snapshot, done.</td>
+            </tr>
+            <tr>
+              <td>An ingest-only agent (not paired)</td>
+              <td>Shows on the page as “not paired.” Pair it (ch. <a href="20-pair-and-block.html">20</a>) if you want specs from that box.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout info">
+          <strong>Same pairing as Block</strong>
+          The host key that can pick up a ban is the only key that can post a snapshot.
+          The shared ingest token cannot. A viewer can see the last snapshot; only an admin can request a new one.
+        </div>
+      </section>
+
+      <section class="block" id="need">
+        <h2>What you need</h2>
+        <ol>
+          <li>Manager and sensors on <strong>0.9.25+</strong>. Older agents ignore the <code>stats</code> command.</li>
+          <li>The sensor is paired and <strong>Approved</strong>, and the agent unit has <code>--cred</code> so it polls (the install script already does this).</li>
+          <li>Open <strong>Status</strong> → <strong>Check now</strong> on one host, or <strong>Check all paired hosts</strong>.</li>
+        </ol>
+        <p>
+          All-in-one (manager tails its own log): you can Check the manager with no pairing.
+          Split fleet: pair each box you want on this page. Log shipping still works unpaired.
+        </p>
+      </section>
+
+      <section class="block" id="ui">
+        <h2>The Status page</h2>
+        <p>One card per host. After a check you see:</p>
+        <ul>
+          <li>Hostname, OS / arch, CPU count, uptime, agent version</li>
+          <li>Memory used / available (and swap if the OS reports it)</li>
+          <li>Load 1 / 5 / 15 (Linux; Windows has no load average)</li>
+          <li>Disk used / free for <code>/</code>, <code>/var</code>, <code>/home</code> when they are distinct mounts (Windows: <code>C:\</code>)</li>
+          <li>A small chart of memory, disk, and load across <em>your</em> previous checks (up to 24 kept, 40 stored)</li>
+        </ul>
+        <p>
+          Check again when you care. The chart is “the last times you asked,” not a 24-hour timeseries.
+          If a host is down, the command expires in two minutes and the last snapshot stays on the card.
+        </p>
+      </section>
+
+      <section class="block" id="api">
+        <h2>API</h2>
+        <table>
+          <thead><tr><th>Call</th><th>Who</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /api/status</code></td><td>session</td><td>Last snapshot + short history for the manager and every non-revoked host</td></tr>
+            <tr><td><code>POST /api/status/check</code></td><td>admin</td><td>Snapshot the manager now</td></tr>
+            <tr><td><code>POST /api/agents/{id}/check</code></td><td>admin</td><td>Queue <code>stats</code> on that paired host (<code>local</code> = manager)</td></tr>
+            <tr><td><code>POST /api/agents/check-all</code></td><td>admin</td><td>Queue every approved host + snapshot the manager</td></tr>
+            <tr><td><code>POST /api/agent/stats</code></td><td>that host’s pair key</td><td>Where the sensor posts the snapshot</td></tr>
+          </tbody>
+        </table>
+        <p>The ingest Bearer cannot request or post snapshots. Commands expire in 2 minutes if the sensor is down.</p>
+      </section>
+
+      <section class="block" id="not">
+        <h2>What it is not</h2>
+        <ul>
+          <li>Not a metrics product. No 10-second scrape, no PromQL, no pager.</li>
+          <li>Not FIM. Reading disk free is not watching files. Secret-file alerts still come from the <em>access log</em> (ch. 07 / 14).</li>
+          <li>Not continuous CPU %. Load average is the one-shot number Linux already keeps.</li>
+          <li>Not a reason to skip pairing. Unpaired sensors keep shipping logs; they just cannot answer Check.</li>
+        </ul>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 21 · previous: <a href="20-pair-and-block.html">20 · Pair &amp; block</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

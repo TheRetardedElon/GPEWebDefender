@@ -16,12 +16,13 @@
       <header class="hero">
         <h1>09 · Agent &amp; hosts</h1>
         <p class="lead">
-          One manager. Zero or more agents. Same binary. Agents only tail files and POST lines —
-          they do not run detection. The app can also POST on its own — that is plane 2,
+          One manager. Zero or more agents. Same binary. Agents tail files and POST lines —
+          they do not run detection. After you pair a host (ch. <a href="20-pair-and-block.html">20</a>)
+          they also pull block orders and on-demand status checks. The app can POST on its own — that is plane 2,
           chapter <a href="19-hook-your-app.html">19</a>.
         </p>
         <div class="meta-row">
-          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill live">Reviewed 2026-08-16</span>
           <span class="pill">POST /api/ingest</span>
         </div>
       </header>
@@ -62,6 +63,7 @@ flowchart LR
         <p class="diagram-caption">
           Agent buffer is 256 lines. If the manager is down and the buffer fills, lines are dropped
           (logged as <code>buffer full</code>). v0.1 has no disk queue.
+          Pairing and optional block orders are chapter <a href="20-pair-and-block.html">20</a> — shipping logs does not require that.
         </p>
       </section>
 
@@ -80,7 +82,7 @@ gpewebdefender agent \
         <table>
           <thead><tr><th>Detail</th><th>Behavior</th></tr></thead>
           <tbody>
-            <tr><td>Auth</td><td><code>Authorization: Bearer</code> must match manager <code>--token</code></td></tr>
+            <tr><td>Auth</td><td>Shared ingest token, <em>or</em> that host’s pair key after Approve. The ingest token never grants block orders.</td></tr>
             <tr><td>Source</td><td><code>X-SIEM-Source</code> = <code>--name</code> (default: hostname). Appears in the host dropdown and on each alert.</td></tr>
             <tr><td>Linux auth</td><td><code>--journal</code> (Debian 13+), or <code>--tail /var/log/auth.log</code>. See <a href="16-reports-and-auth.html">16</a> and <a href="17-configure.html">17</a>.</td></tr>
             <tr><td>Body</td><td>Plain text, newline-separated access-log lines</td></tr>
@@ -100,6 +102,30 @@ gpewebdefender agent \
           Put the manager on localhost or a private NIC. If agents are remote, use a tunnel, tailnet,
           or nginx allowlist — not a public <code>:8787</code>. See <a href="10-deploy.html">10</a>.
         </div>
+      </section>
+
+      <section class="block">
+        <h2>Pairing (optional)</h2>
+        <p>
+          Log shipping does not need this. Pairing is how an admin can later click
+          <strong>Block</strong> on an alert and have <em>that</em> host drop the IP
+          in fail2ban / UFW / Windows Firewall. Full chapter: <a href="20-pair-and-block.html">20</a>.
+        </p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code># on the manager UI, as admin:
+#   Settings → Paired hosts → invent a phrase → Pair a host… → copy the code
+#
+# on the sensor
+gpewebdefender pair --url http://MONITOR:8787 --name web-1 --code ABCD-2341 --block fail2ban
+# type the phrase when asked, then Approve the fingerprint in Settings</code></pre>
+        <p>
+          Existing agents keep shipping with the old token. To enable block they need
+          a binary that includes <code>pair</code> (0.9.19+; 0.9.25+ to answer Status checks), then the three human steps,
+          and <code>--cred</code> on the agent unit so it polls for orders.
+        </p>
+        <p>
+          After Approve, <strong>Status → Check now</strong> pulls load / memory / disk from that box once.
+          Same poll as block orders. Chapter <a href="21-host-status.html">21</a>.
+        </p>
       </section>
 
       <footer class="foot">GPEWebDefender DocHub · 09 · next: <a href="10-deploy.html">10 · Deploy</a></footer>

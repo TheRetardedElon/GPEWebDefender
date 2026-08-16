@@ -54,6 +54,11 @@
             </tr>
           </tbody>
         </table>
+        <p>
+          Status checks (ch. <a href="21-host-status.html">21</a>) read load / memory / disk
+          <em>once when you click</em>. They do not see file contents and they do not watch
+          <code>.env</code> on disk. A secret-file alert is still an <em>access-log</em> hit.
+        </p>
         <div class="callout risk">
           <strong>Do not “fix” this by logging bodies</strong>
           Access logs with <code>$request_body</code> will eventually contain passwords, tokens, or card data.
@@ -120,6 +125,8 @@
           <li>Logging request bodies that might contain secrets or card data.</li>
           <li>A public UI with no gate on a product host.</li>
           <li>Pretending this is a WAF or a full SOC.</li>
+          <li>Auto-ban from a detection rule. Manual block after pair + Approve only (ch. <a href="20-pair-and-block.html">20</a>).</li>
+          <li>A background host-metrics scrape. Status is click-to-check (ch. <a href="21-host-status.html">21</a>).</li>
         </ul>
       </section>
 

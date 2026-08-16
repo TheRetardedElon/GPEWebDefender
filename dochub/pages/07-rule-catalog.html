@@ -69,8 +69,10 @@
         <table>
           <thead><tr><th>id</th><th>Title</th><th>Sev</th><th>MITRE</th></tr></thead>
           <tbody>
-            <tr><td><code>web.recon.env</code></td><td>Secret file probe (.env / credentials)</td><td>high</td><td>T1595.003</td></tr>
+            <tr><td><code>web.recon.env</code></td><td>Secret file probe (.env / config / keys)</td><td>high</td><td>T1595.003</td></tr>
+            <tr><td><code>web.secret.served</code></td><td>Secret file was served (200/206) — leak</td><td>critical</td><td>T1552.001</td></tr>
             <tr><td><code>web.recon.git</code></td><td>Source-control probe (.git / .svn)</td><td>high</td><td>T1595.003</td></tr>
+            <tr><td><code>web.secret.git_served</code></td><td>Source-control files were served (.git)</td><td>critical</td><td>T1552.001</td></tr>
             <tr><td><code>web.recon.backup</code></td><td>Backup / dump file probe</td><td>medium</td><td>T1595.003</td></tr>
             <tr><td><code>web.recon.debug</code></td><td>Debug / actuator / server-status probe</td><td>medium</td><td>T1595.002</td></tr>
             <tr><td><code>web.recon.admin</code></td><td>Admin / panel hunting</td><td>low</td><td>T1595.002</td></tr>

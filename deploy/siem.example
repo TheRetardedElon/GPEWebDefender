@@ -2,7 +2,7 @@
 # Copy to /usr/local/bin/siem and chmod 755.
 # This box is systemd, not Node — do not wrap the Go binary in PM2.
 
-svc=gpesiem
+svc=gpewebdefender
 
 case "${1:-}" in
   status)
@@ -21,7 +21,7 @@ case "${1:-}" in
     exec journalctl -u "$svc" -n "${2:-80}" -f
     ;;
   version)
-    command -v gpesiem >/dev/null && gpewebdefender version
+    command -v gpewebdefender >/dev/null && gpewebdefender version
     systemctl is-active "$svc" nginx
     ;;
   *)

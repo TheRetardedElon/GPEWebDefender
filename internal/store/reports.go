@@ -363,25 +363,17 @@ func (s *Store) ExportAlerts(since time.Time, source string, limit int) ([]event
 	}
 	where, args := reportWhere(since, source, "")
 	args = append(args, limit)
-	rows, err := s.db.Query(`SELECT id, ts, event_id, rule_id, title, severity, category, src_ip, method, url, status, ua, evidence, mitre, count, source,
-		COALESCE(country,''), COALESCE(country_name,''), COALESCE(lat,0), COALESCE(lon,0), COALESCE(tags,''), COALESCE(num,0)
-		FROM alerts `+where+` ORDER BY ts DESC LIMIT ?`, args...)
+	rows, err := s.db.Query(`SELECT `+alertCols+` FROM alerts `+where+` ORDER BY ts DESC LIMIT ?`, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []event.Alert
 	for rows.Next() {
-		var a event.Alert
-		var ts int64
-		var mitre, tags string
-		if err := rows.Scan(&a.ID, &ts, &a.EventID, &a.RuleID, &a.Title, &a.Severity, &a.Category, &a.SrcIP, &a.Method, &a.URL, &a.Status, &a.UA, &a.Evidence, &mitre, &a.Count, &a.Source,
-			&a.Country, &a.CountryName, &a.Lat, &a.Lon, &tags, &a.Num); err != nil {
+		a, err := scanAlert(rows)
+		if err != nil {
 			return nil, err
 		}
-		a.Time = time.UnixMilli(ts).UTC()
-		_ = json.Unmarshal([]byte(mitre), &a.MITRE)
-		_ = json.Unmarshal([]byte(tags), &a.Tags)
 		out = append(out, a)
 	}
 	if out == nil {

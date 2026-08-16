@@ -22,10 +22,10 @@
         </p>
         <div class="meta-row">
           <span class="pill live"><strong>Product</strong> web-attack monitor</span>
-          <span class="pill"><strong>Version</strong> 0.9.14</span>
+          <span class="pill"><strong>Version</strong> 0.9.25</span>
           <span class="pill warn"><strong>Not</strong> OSSEC source</span>
-          <span class="pill">Chapters 00–19</span>
-          <span class="pill">Updated <span data-generated>2026-08-15</span></span>
+          <span class="pill">Chapters 00–21</span>
+          <span class="pill">Updated <span data-generated>2026-08-16</span></span>
         </div>
       </header>
 
@@ -41,7 +41,8 @@
       <div class="callout good">
         <strong>Status (2026-08-15)</strong>
         One Go binary + SQLite. Built-in YAML rules (web, snoop, canary, modern probes, Linux auth, app probes).
-        Live map (shots only when an alert happens), Insight reports, CSV/JSON export, operator accounts (Argon2id).
+        Live map (shots only when an alert happens), Insight reports, CSV/JSON export, operator accounts (Argon2id),
+        pairing + block, on-demand host Status.
         Comfortable on a dedicated <strong>2 CPU / 2 GB</strong> box.
         <strong>New here?</strong> <a href="pages/03-install-and-run.html">03 · Install &amp; run</a> — Method A is the script, Method B is by hand.
         Demo is fake. Live traffic starts when an agent (or <code>--tail</code>) ships a real access log.
@@ -204,6 +205,18 @@ flowchart TB
             <p>Fire-and-forget POST for logins, canaries, and denials the access log cannot see.</p>
             <div class="tags"><span class="tag live">app</span></div>
           </a>
+          <a class="card" href="pages/20-pair-and-block.html">
+            <div class="num">20</div>
+            <h3>Pair &amp; block</h3>
+            <p>Phrase + one-time code + Approve. Then an admin can ban a public IP on that host’s firewall.</p>
+            <div class="tags"><span class="tag live">contain</span></div>
+          </a>
+          <a class="card" href="pages/21-host-status.html">
+            <div class="num">21</div>
+            <h3>Host status</h3>
+            <p>Click Check. Load, memory, disk. No background scrape. Pairing required for remote boxes.</p>
+            <div class="tags"><span class="tag live">ops</span></div>
+          </a>
         </div>
       </section>
 
@@ -216,7 +229,7 @@ flowchart TB
           <tbody>
             <tr>
               <td><strong>Out of band</strong></td>
-              <td>We tail logs. We do not proxy HTTP. A crash here cannot take the site down.</td>
+              <td>We tail logs. We do not proxy HTTP. A crash here cannot take the site down. Optional block (ch. 20) is the host firewall after an admin clicks — still not in the request path.</td>
             </tr>
             <tr>
               <td><strong>Access logs are the sensor</strong></td>
@@ -243,7 +256,7 @@ flowchart TB
       </section>
 
       <footer class="foot">
-        gpewebdefender DocHub · chapters 00–19 · configure your own hosts. Nothing inventory-specific in this tree.
+        gpewebdefender DocHub · chapters 00–21 · configure your own hosts. Nothing inventory-specific in this tree.
         Not OSSEC. Not a WAF. Develop carefully.
       </footer>
     </main>

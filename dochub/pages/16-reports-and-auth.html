@@ -46,6 +46,8 @@
             <tr><td>Reports → Auth · App</td><td>Structured <code>kind=applogin</code> events your application ships.</td></tr>
             <tr><td>Reports → Auth · Tenants</td><td>Site-owner / tenant logins: <code>kind=tenantlogin</code> or <code>kind=applogin</code> + <code>role=tenant</code>. Own map color.</td></tr>
             <tr><td>Reports → Probes</td><td>Application security telemetry: <code>kind=secprobe</code> + a <code>reason</code>. Canaries, path probes, denied privileged routes, bad webhooks, login rate-limits, identifier bursts.</td></tr>
+            <tr><td>Reports → Blocklist</td><td>Who you banned from the portal: IP, which host (this vs all paired), the alert you were looking at, whether the sensor applied it, time left, and hits after the ban (should stay 0 if it is working). Unban from the same table.</td></tr>
+            <tr><td>Status</td><td>On-demand load / memory / disk for the manager and every paired host. Click Check — nothing is scraped in the background. Chapter <a href="21-host-status.html">21</a>.</td></tr>
             <tr><td>Search</td><td>Keyword + IP + host. SQLite FTS5 on the manager — no Elastic.</td></tr>
           </tbody>
         </table>

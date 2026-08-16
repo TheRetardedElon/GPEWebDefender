@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 350" width="400" height="350">
+  <defs>
+    <!-- The neon cyber glow filter -->
+    <filter id="vePreciseStaticGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    
+    <!-- The dot-grid pattern to match your GoPastEarth map aesthetic -->
+    <pattern id="vePreciseStaticGrid" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.5" fill="#00ff66" opacity="0.4" />
+    </pattern>
+  </defs>
+
+  <g filter="url(#vePreciseStaticGlow)">
+    <!-- Venezuela Mainland (High-Fidelity Shape Trace) -->
+    <path d="M 60,150 L 80,120 L 110,100 L 140,95 L 170,105 L 200,90 L 230,100 L 260,95 L 290,110 L 320,130 L 340,160 L 350,190 L 335,220 L 305,240 L 275,250 L 245,260 L 210,245 L 180,260 L 150,240 L 130,210 L 105,225 L 85,200 L 70,175 Z" 
+          fill="url(#vePreciseStaticGrid)" 
+          stroke="#00ff66" 
+          stroke-width="1.2" 
+          stroke-linejoin="round" />
+          
+    <!-- Margarita Island & Northern Offshore Details -->
+    <path d="M 245,75 L 260,70 L 265,80 L 250,85 Z" 
+          fill="url(#vePreciseStaticGrid)" 
+          stroke="#00ff66" 
+          stroke-width="1" />
+  </g>
+</svg>

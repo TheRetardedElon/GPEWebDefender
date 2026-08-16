@@ -1,0 +1,11 @@
+# /etc/fail2ban/jail.d/gpesiem.local
+# Dedicated jail so dashboard block orders do not share the sshd jail.
+# The agent will write this for you if it can; this file is the hand-install copy.
+[gpesiem]
+enabled   = true
+filter    = gpesiem
+banaction = ufw
+bantime   = 7d
+findtime  = 1d
+maxretry  = 999999
+backend   = systemd
