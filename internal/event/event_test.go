@@ -19,6 +19,10 @@ func TestQuietStatic(t *testing.T) {
 	if QuietStatic(login) {
 		t.Fatal("non-web kinds are never quiet")
 	}
+	sm := Event{Kind: KindWeb, Status: 200, Path: "/assets/app.js.map"}
+	if QuietStatic(sm) {
+		t.Fatal("source maps must not be quiet")
+	}
 }
 
 func TestNormalizeReasonNew(t *testing.T) {
@@ -27,5 +31,11 @@ func TestNormalizeReasonNew(t *testing.T) {
 	}
 	if NormalizeReason("2fa_bypass") != "stepup_bypass" {
 		t.Fatal(NormalizeReason("2fa_bypass"))
+	}
+	if NormalizeReason("arcade_score_abuse") != "score_abuse" {
+		t.Fatal(NormalizeReason("arcade_score_abuse"))
+	}
+	if NormalizeReason("public_429") != "rate_limit" {
+		t.Fatal(NormalizeReason("public_429"))
 	}
 }

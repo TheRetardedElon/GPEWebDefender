@@ -203,6 +203,9 @@ X-SIEM-Source: acme-api
             <tr><td><code>ws_abuse</code></td><td>Socket / live channel abuse</td></tr>
             <tr><td><code>logic_deny</code></td><td>Negative price, qty cheat, etc.</td></tr>
             <tr><td><code>stepup_bypass</code></td><td>Tried to skip 2FA</td></tr>
+            <tr><td><code>score_abuse</code></td><td>Score / leaderboard cheat or flood</td></tr>
+            <tr><td><code>rate_limit</code></td><td>429 on a public (non-login) route</td></tr>
+            <tr><td><code>signup_abuse</code></td><td>Registration spray</td></tr>
           </tbody>
         </table>
         <p class="hint">
@@ -214,7 +217,7 @@ X-SIEM-Source: acme-api
       <section class="block" id="canary">
         <h2>Plant a canary (five minutes)</h2>
         <ol>
-          <li>Make this URL exist and return 404 or 403: <code>/.well-known/siem-canary</code> (or <code>/__canary__/siem</code>).</li>
+          <li>Make this URL exist and return 404 or 403: <code>/.well-known/siem-canary</code>, <code>/__canary__/siem</code>, or <code>/api/public/__siem-canary__</code>.</li>
           <li>Do not link it from the real UI. You may list it in <code>robots.txt</code> as <code>Disallow</code> — scanners read that file on purpose.</li>
           <li>Either the access-log agent will see the GET (plane 1), or the app POSTs <code>reason=canary_hit</code> (plane 2). Both is fine.</li>
           <li>One hit is enough. If a real customer can click it, you planted it wrong.</li>
@@ -241,15 +244,17 @@ X-SIEM-Source: acme-api
           <li>Open the UI. Live → <strong>Web</strong> if login noise is loud. Reports → vectors / auth / probes.</li>
           <li>App: fire-and-forget POST for login fails. Confirm Reports → Auth · App.</li>
           <li>Plant <code>/.well-known/siem-canary</code>. Hit it once from a laptop. Confirm a canary alert.</li>
-          <li>When the app can see IDOR / 2FA skip / bad webhook, POST those reasons. Do not invent them in YAML.</li>
+          <li>Confirm the public host does <em>not</em> 200 <code>/@vite/client</code>.</li>
+          <li>When the app can see IDOR / 2FA skip / bad webhook / score abuse, POST those reasons. Do not invent them in YAML.</li>
         </ol>
+        <p>The one-page hunt list is <a href="22-protect-your-site.html">22 · Protect your site</a>.</p>
         <p>
           Live filters: severity row, then <strong>Everything / Web / Linux / App login / Tenants / Probes</strong>.
           That is how SSH and app-login rows stop burying a SQLi.
         </p>
       </section>
 
-      <footer class="foot">GPEWebDefender DocHub · 19 · back to <a href="../index.html">hub home</a></footer>
+      <footer class="foot">GPEWebDefender DocHub · 19 · next: <a href="22-protect-your-site.html">22 · Protect your site</a></footer>
     </main>
   </div>
   <script src="../js/nav.js"></script>

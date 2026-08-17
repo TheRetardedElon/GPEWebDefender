@@ -46,6 +46,16 @@ func TestSecprobeReason(t *testing.T) {
 	if !found {
 		t.Fatalf("expected sec.canary.hit, got %+v", got)
 	}
+	ev, ok = parse.Parse(`{"kind":"secprobe","src_ip":"203.0.113.9","reason":"arcade_score_abuse"}`, "app")
+	if !ok {
+		t.Fatal("parse score")
+	}
+	ev.ID = "s2"
+	ev.Time = time.Now().UTC()
+	got = e.Evaluate(ev)
+	if !hasRule(got, "sec.score.abuse") {
+		t.Fatalf("expected sec.score.abuse, got %+v", got)
+	}
 }
 
 func hit(t *testing.T, e *Engine, line string) []event.Alert {
@@ -226,5 +236,21 @@ func TestCanaryPath(t *testing.T) {
 	al := hit(t, e, line)
 	if !hasRule(al, "web.canary.robots_trap") {
 		t.Fatalf("missed canary: %+v", al)
+	}
+	al = hit(t, e, `1.1.1.1 - - [14/Aug/2026:12:00:01 +0000] "GET /api/public/__siem-canary__ HTTP/1.1" 404 1 "-" "Mozilla"`)
+	if !hasRule(al, "web.canary.well_known") {
+		t.Fatalf("missed public canary: %+v", al)
+	}
+}
+
+func TestDevServerLeak(t *testing.T) {
+	e := loadWeb(t)
+	al := hit(t, e, `1.1.1.1 - - [17/Aug/2026:12:00:01 +0000] "GET /@vite/client HTTP/1.1" 200 80 "-" "Mozilla"`)
+	if !hasRule(al, "web.recon.devserver") || !hasRule(al, "web.secret.dev_served") {
+		t.Fatalf("vite 200: %+v", al)
+	}
+	al = hit(t, e, `1.1.1.1 - - [17/Aug/2026:12:00:01 +0000] "GET /assets/app.js.map HTTP/1.1" 200 80 "-" "Mozilla"`)
+	if !hasRule(al, "web.secret.map_served") {
+		t.Fatalf("map 200: %+v", al)
 	}
 }

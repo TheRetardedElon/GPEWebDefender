@@ -116,12 +116,12 @@ func (s *Store) Search(q SearchQuery) (event.SearchPage, error) {
 	if err != nil {
 		return event.SearchPage{}, err
 	}
-	defer rows.Close()
 	var hits []event.SearchHit
 	for rows.Next() {
 		var h event.SearchHit
 		var num, tsRaw string
 		if err := rows.Scan(&h.Bucket, &h.Ref, &num, &h.SrcIP, &h.User, &h.Host, &h.Source, &h.Path, &h.URL, &h.Title, &h.Kind, &h.Category, &tsRaw); err != nil {
+			rows.Close()
 			return event.SearchPage{}, err
 		}
 		h.Num, _ = strconv.ParseInt(num, 10, 64)
@@ -130,6 +130,7 @@ func (s *Store) Search(q SearchQuery) (event.SearchPage, error) {
 		}
 		hits = append(hits, h)
 	}
+	rows.Close()
 	if hits == nil {
 		hits = []event.SearchHit{}
 	}

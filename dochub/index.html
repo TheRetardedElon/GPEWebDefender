@@ -22,10 +22,10 @@
         </p>
         <div class="meta-row">
           <span class="pill live"><strong>Product</strong> web-attack monitor</span>
-          <span class="pill"><strong>Version</strong> 0.9.25</span>
+          <span class="pill"><strong>Version</strong> 0.9.29</span>
           <span class="pill warn"><strong>Not</strong> OSSEC source</span>
-          <span class="pill">Chapters 00–21</span>
-          <span class="pill">Updated <span data-generated>2026-08-16</span></span>
+          <span class="pill">Chapters 00–22</span>
+          <span class="pill">Updated <span data-generated>2026-08-17</span></span>
         </div>
       </header>
 
@@ -40,9 +40,9 @@
       </div>
       <div class="callout good">
         <strong>Status (2026-08-15)</strong>
-        One Go binary + SQLite. Built-in YAML rules (web, snoop, canary, modern probes, Linux auth, app probes).
-        Live map (shots only when an alert happens), Insight reports, CSV/JSON export, operator accounts (Argon2id),
-        pairing + block, on-demand host Status.
+        One Go binary + SQLite. Built-in YAML (web, snoop, canary, modern probes, Linux auth, app probes).
+        Live map, Insight, Probes, Blocklist, pairing + block, on-demand Status.
+        <strong>Protect a site:</strong> <a href="pages/22-protect-your-site.html">22</a> — canaries, no dev-server on product hosts, app postcards.
         Comfortable on a dedicated <strong>2 CPU / 2 GB</strong> box.
         <strong>New here?</strong> <a href="pages/03-install-and-run.html">03 · Install &amp; run</a> — Method A is the script, Method B is by hand.
         Demo is fake. Live traffic starts when an agent (or <code>--tail</code>) ships a real access log.
@@ -217,6 +217,12 @@ flowchart TB
             <p>Click Check. Load, memory, disk. No background scrape. Pairing required for remote boxes.</p>
             <div class="tags"><span class="tag live">ops</span></div>
           </a>
+          <a class="card" href="pages/22-protect-your-site.html">
+            <div class="num">22</div>
+            <h3>Protect your site</h3>
+            <p>Canaries, no Vite on product hosts, app postcards, where to look. ACMECo only.</p>
+            <div class="tags"><span class="tag live">hunt</span></div>
+          </a>
         </div>
       </section>
 
@@ -256,7 +262,7 @@ flowchart TB
       </section>
 
       <footer class="foot">
-        gpewebdefender DocHub · chapters 00–21 · configure your own hosts. Nothing inventory-specific in this tree.
+        gpewebdefender DocHub · chapters 00–22 · configure your own hosts. Nothing inventory-specific in this tree.
         Not OSSEC. Not a WAF. Develop carefully.
       </footer>
     </main>

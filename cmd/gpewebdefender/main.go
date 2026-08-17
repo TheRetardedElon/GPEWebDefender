@@ -29,7 +29,7 @@ import (
 	"gpewebdefender/rules"
 )
 
-const version = "0.9.25"
+const version = "0.9.29"
 
 func main() {
 	log.SetFlags(0)

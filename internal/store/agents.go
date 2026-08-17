@@ -754,7 +754,6 @@ func (s *Store) BlockList() (BlockReport, error) {
 	if err != nil {
 		return rep, err
 	}
-	defer rows.Close()
 	ips := map[string]bool{}
 	for rows.Next() {
 		var b AgentBan
@@ -762,16 +761,13 @@ func (s *Store) BlockList() (BlockReport, error) {
 		var active int
 		if err := rows.Scan(&b.AgentID, &b.Host, &b.IP, &until, &b.Duration, &created, &b.CreatedBy, &active,
 			&b.Title, &b.Category, &b.AlertNum, &b.Scope, &b.Applied); err != nil {
+			rows.Close()
 			return rep, err
 		}
 		b.Active = active != 0
 		b.Created = time.UnixMilli(created).UTC()
 		if until > 0 {
 			b.Until = time.UnixMilli(until).UTC()
-		}
-		if b.Active && b.Host != "" {
-			_ = s.db.QueryRow(`SELECT COUNT(*) FROM alerts WHERE src_ip = ? AND source = ? AND ts > ?`,
-				b.IP, b.Host, created).Scan(&b.HitsAfter)
 		}
 		if b.Active {
 			rep.Active++
@@ -787,8 +783,22 @@ func (s *Store) BlockList() (BlockReport, error) {
 		}
 		rep.Rows = append(rep.Rows, b)
 	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return rep, err
+	}
+	// One SQLite connection: never QueryRow while this result set is open.
+	for i := range rep.Rows {
+		b := &rep.Rows[i]
+		if !b.Active || b.Host == "" {
+			continue
+		}
+		_ = s.db.QueryRow(`SELECT COUNT(*) FROM alerts WHERE src_ip = ? AND source = ? AND ts > ?`,
+			b.IP, b.Host, b.Created.UnixMilli()).Scan(&b.HitsAfter)
+	}
 	rep.IPs = len(ips)
-	return rep, rows.Err()
+	return rep, nil
 }
 
 func (s *Store) audit(actor, action, agentID, ip, detail string) {

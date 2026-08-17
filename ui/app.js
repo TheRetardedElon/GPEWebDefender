@@ -108,6 +108,30 @@ const CAT_LABEL = {
   authz: "Authz deny", secprobe: "App probe",
   tamper: "Tamper", bypass: "Bypass", web: "Other",
 };
+const REASON_LABEL = {
+  canary_hit: "canary hit",
+  path_probe: "path probe",
+  sensitive_deny: "privileged path denied",
+  webhook_reject: "webhook rejected",
+  auth_rate_limit: "login rate-limited",
+  rate_limit: "public route rate-limited",
+  enum_burst: "identifier enum burst",
+  app_deny: "feature denied (no credentials)",
+  score_abuse: "score / leaderboard abuse",
+  signup_abuse: "signup abuse",
+  idor: "cross-record access (IDOR)",
+  priv_esc: "privilege escalation",
+  key_replay: "stolen or replayed key",
+  ssrf_out: "outbound fetch blocked",
+  upload_abuse: "upload abuse",
+  ws_abuse: "live-channel abuse",
+  logic_deny: "business-logic abuse",
+  stepup_bypass: "2FA / step-up bypass",
+};
+function reasonLabel(r) {
+  r = String(r || "").trim();
+  return REASON_LABEL[r] || r.replace(/_/g, " ");
+}
 
 const map = {
   canvas: null,
@@ -970,7 +994,7 @@ function alertWhat(a) {
     return (a.path || url || "/login").trim();
   }
   if (kind === "secprobe") {
-    return a.reason ? a.reason.replace(/_/g, " ") : (a.path || url || a.title || "");
+    return a.reason ? reasonLabel(a.reason) : (a.path || url || a.title || "");
   }
   if (a.method && (a.path || url)) return a.method + " " + (a.path || url);
   return url || a.title || "";
@@ -993,7 +1017,7 @@ function detailRows(a) {
     add("Result", outcome);
     add("What", what && what !== a.title ? what : "");
   } else if (kind === "secprobe") {
-    add("Reason", a.reason ? a.reason.replace(/_/g, " ") : "");
+    add("Reason", a.reason ? reasonLabel(a.reason) : "");
     add("Path", a.path || a.url || "");
     if (a.status) add("HTTP status", String(a.status));
   } else {
@@ -1173,7 +1197,6 @@ async function refresh() {
   renderAttackers(attackers);
   renderMapMeta();
   await loadAlerts(alertBuf.length ? "newer" : "reset");
-  if (currentView === "reports") refreshReports().catch(() => {});
   if (currentView === "settings") loadSettings().catch(() => {});
 }
 
@@ -1256,6 +1279,7 @@ if (hostSel) {
     if (selectedSource) fitHomes();
     else { mapCam.z = 1; mapCam.x = 0; mapCam.y = 0; }
     refresh().catch(console.error);
+    if (currentView === "reports") refreshReports().catch(console.error);
   });
 }
 
@@ -1959,7 +1983,7 @@ function authEmpty(kind) {
     return `<div class="hint-box">No tenant / site-owner login events yet. The app should POST <code>kind=tenantlogin</code> (or <code>kind=applogin</code> with <code>role=tenant</code>). Never send passwords.</div>`;
   }
   if (kind === "probes") {
-    return `<div class="hint-box">No application probe events yet. Your app POSTs <code>kind=secprobe</code> with a <code>reason</code> (<code>canary_hit</code>, <code>path_probe</code>, <code>sensitive_deny</code>, <code>webhook_reject</code>, <code>auth_rate_limit</code>, <code>enum_burst</code>, <code>app_deny</code>). Plant generic canaries at <code>/.well-known/siem-canary</code> or <code>/__canary__/siem</code>. Never send secrets.</div>`;
+    return `<div class="hint-box">No application probe events yet. Your app POSTs <code>kind=secprobe</code> with a <code>reason</code> (<code>canary_hit</code>, <code>idor</code>, <code>key_replay</code>, <code>score_abuse</code>, <code>rate_limit</code>, <code>enum_burst</code>, …). Plant generic canaries at <code>/.well-known/siem-canary</code>. Never send secrets. See Docs 19.</div>`;
   }
   if (kind === "app") {
     return `<div class="hint-box">No application login events yet. Your app should POST JSON to <code>/api/ingest</code> (Bearer token, <code>X-SIEM-Source</code> set). Do not send passwords.<pre style="margin:10px 0 0;white-space:pre-wrap">{
@@ -2090,14 +2114,15 @@ function renderBlockReport(rep) {
   stats.innerHTML = `
     <div class="card"><div class="k">Active bans</div><div class="v">${n}</div></div>
     <div class="card"><div class="k">IPs</div><div class="v">${ips}</div></div>
-    <div class="card"><div class="k">Applied</div><div class="v">${rep.applied || 0}</div></div>
-    <div class="card"><div class="k">Waiting</div><div class="v">${rep.queued || 0}</div></div>
-    <div class="card"><div class="k">Failed</div><div class="v">${rep.failed || 0}</div></div>
-    <div class="card"><div class="k">Rows</div><div class="v">${(rep.rows || []).length}</div></div>`;
+    <div class="card"><div class="k">Applied</div><div class="v">${(rep && rep.applied) || 0}</div></div>
+    <div class="card"><div class="k">Waiting</div><div class="v">${(rep && rep.queued) || 0}</div></div>
+    <div class="card"><div class="k">Failed</div><div class="v">${(rep && rep.failed) || 0}</div></div>
+    <div class="card"><div class="k">Rows</div><div class="v">${((rep && rep.rows) || []).length}</div></div>`;
   const el = $("#report-window");
   if (el) el.textContent = "current blocklist · one row per host · hits after ban should stay 0 if it is working";
-  const rows = (rep.rows || []).filter(r => r.active);
-  const old = (rep.rows || []).filter(r => !r.active).slice(0, 20);
+  const all = (rep && rep.rows) || [];
+  const rows = all.filter(r => r.active);
+  const old = all.filter(r => !r.active).slice(0, 20);
   const line = r => {
     const why = r.title || "—";
     const num = r.alert_num ? "#" + r.alert_num : "";
@@ -2117,35 +2142,59 @@ function renderBlockReport(rep) {
   };
   const table = list => !list.length
     ? `<div class="empty">None</div>`
-    : `<table class="rpt"><thead><tr><th>IP</th><th>Host</th><th>Blocked for</th><th>Status</th><th>Time left</th><th></th></tr></thead><tbody>${list.map(line).join("")}</tbody></table>`;
-  box.innerHTML = panel("Currently blocked", table(rows), "span2") +
-    panel("Recently ended", table(old), "span2");
+    : `<table class="rpt"><thead><tr><th>IP</th><th>Host</th><th>Blocked for</th><th>On the box?</th><th>Time left</th><th></th></tr></thead><tbody>${list.map(line).join("")}</tbody></table>`;
+  const emptyHelp = `<div class="hint-box">Nothing is banned right now. Open an alert on <strong>Live</strong>, then <strong>Block on this host</strong> (15m / 1h / 24h / 7d) or all paired hosts. This page lists the IP, which host, the alert that caused it, whether the sensor applied it, time left, and hits after the ban (should stay 0).</div>`;
+  box.innerHTML = (rows.length || old.length
+    ? panel("Currently blocked", table(rows), "span2") + panel("Recently ended", table(old), "span2")
+    : panel("Currently blocked", emptyHelp, "span2"));
+}
+
+let reportSeq = 0;
+
+function reportTabLabel(kind) {
+  return ({
+    vectors: "Insight", web: "Auth · Web", linux: "Auth · Linux",
+    app: "Auth · App", tenant: "Auth · Tenants", probes: "Probes", blocks: "Blocklist",
+  })[kind] || kind;
 }
 
 async function refreshReports() {
+  const seq = ++reportSeq;
+  const kind = reportKind;
   markReportChrome();
-  try {
-    const st = await j("/api/settings");
-    const cur = (st && st.settings) || st || {};
-    if (cur.timezone) displayTZ = cur.timezone === "local" ? "local" : "UTC";
-  } catch (_) {}
-  const params = new URLSearchParams({ since: reportRange });
-  if (selectedSource) params.set("source", selectedSource);
   const box = $("#report-body");
   const stats = $("#report-stats");
   if (!box || !stats) return;
+  stats.innerHTML = "";
+  box.innerHTML = `<div class="empty">Loading ${esc(reportTabLabel(kind))}…</div>`;
   try {
-    if (reportKind === "vectors") {
-      renderVectorReport(await j("/api/reports/vectors?" + params.toString()));
+    const st = await j("/api/settings");
+    if (seq !== reportSeq) return;
+    const cur = (st && st.settings) || st || {};
+    if (cur.timezone) displayTZ = cur.timezone === "local" ? "local" : "UTC";
+  } catch (_) {}
+  if (seq !== reportSeq) return;
+  const params = new URLSearchParams({ since: reportRange });
+  if (selectedSource) params.set("source", selectedSource);
+  try {
+    if (kind === "vectors") {
+      const data = await j("/api/reports/vectors?" + params.toString());
+      if (seq !== reportSeq) return;
+      renderVectorReport(data);
       return;
     }
-    if (reportKind === "blocks") {
-      renderBlockReport(await j("/api/reports/blocks"));
+    if (kind === "blocks") {
+      const data = await j("/api/reports/blocks");
+      if (seq !== reportSeq) return;
+      renderBlockReport(data);
       return;
     }
-    params.set("channel", reportKind);
-    renderAuthReport(await j("/api/reports/auth?" + params.toString()), reportKind);
+    params.set("channel", kind);
+    const data = await j("/api/reports/auth?" + params.toString());
+    if (seq !== reportSeq) return;
+    renderAuthReport(data, kind);
   } catch (err) {
+    if (seq !== reportSeq) return;
     stats.innerHTML = "";
     box.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
   }

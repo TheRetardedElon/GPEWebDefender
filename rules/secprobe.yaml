@@ -136,3 +136,30 @@ rules:
     tags: [secprobe]
     fields: [reason]
     pattern: '^stepup_bypass$'
+
+  - id: sec.score.abuse
+    title: Score / leaderboard abuse
+    severity: medium
+    category: tamper
+    mitre: [T1565]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^score_abuse$'
+
+  - id: sec.rate.limit
+    title: Public route rate-limited
+    severity: low
+    category: dos
+    mitre: [T1499]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^rate_limit$'
+
+  - id: sec.signup.abuse
+    title: Signup / registration abuse
+    severity: medium
+    category: brute
+    mitre: [T1110]
+    tags: [secprobe]
+    fields: [reason]
+    pattern: '^signup_abuse$'

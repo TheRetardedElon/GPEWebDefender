@@ -1,5 +1,5 @@
 /** Shared sidebar for the SIEM DocHub.
- * Chapter order is strictly numerical 00 → 21.
+ * Chapter order is strictly numerical 00 → 22.
  */
 (function () {
   const base = document.body.dataset.base || ".";
@@ -38,6 +38,7 @@
   <a href="${base}/pages/19-hook-your-app.html">19 · Hook your app</a>
   <a href="${base}/pages/20-pair-and-block.html">20 · Pair &amp; block</a>
   <a href="${base}/pages/21-host-status.html">21 · Host status</a>
+  <a href="${base}/pages/22-protect-your-site.html">22 · Protect your site</a>
   `;
   const el = document.getElementById("dochub-nav");
   if (el) el.innerHTML = html;

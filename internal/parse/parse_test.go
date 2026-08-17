@@ -107,6 +107,11 @@ func TestParseSecprobe(t *testing.T) {
 	if !ok || ev.Reason != "app_deny" {
 		t.Fatalf("app deny alias: %+v", ev)
 	}
+	line = `{"kind":"secprobe","src_ip":"203.0.113.9","reason":"arcade_score_abuse","path":"/api/arcade/score"}`
+	ev, ok = Parse(line, "app")
+	if !ok || ev.Reason != "score_abuse" {
+		t.Fatalf("score abuse alias: %+v", ev)
+	}
 }
 
 func TestSkipBlank(t *testing.T) {

@@ -140,6 +140,7 @@ sudo ./deploy/install-agent.sh \
           <li>Optional HTTPS: copy <code>deploy/nginx-gwd.conf.example</code>, certbot, keep ingest off that vhost. See <a href="15-production-edge.html">15</a> and <a href="18-operator-accounts.html">18</a>.</li>
           <li>Optional block from the dashboard: Settings → Paired hosts → invent a phrase → mint a code → <code>gpewebdefender pair</code> on that box → Approve. Chapter <a href="20-pair-and-block.html">20</a>.</li>
           <li>Optional Status: open <strong>Status</strong> and click Check on the manager. Pair a host (same as the block step) if you want load / memory / disk from that box too. Nothing is polled until you click. Chapter <a href="21-host-status.html">21</a>.</li>
+          <li>Protect the site: plant a canary, confirm <code>/@vite/client</code> is not 200, POST app denials the log cannot see. Chapter <a href="22-protect-your-site.html">22</a>.</li>
         </ol>
         <div class="callout info">
           <strong>If the UI is empty</strong>

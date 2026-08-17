@@ -20,7 +20,7 @@
           on a web platform, and how trap paths give you a near-zero false-positive page.
         </p>
         <div class="meta-row">
-          <span class="pill live">Reviewed 2026-08-14</span>
+          <span class="pill live">Reviewed 2026-08-17</span>
           <span class="pill">kind: snoop</span>
           <span class="pill">canary · modern probes</span>
         </div>
@@ -104,6 +104,11 @@
               <td><code>snoop.yaml</code></td>
             </tr>
             <tr>
+              <td>Front-end leak</td>
+              <td><code>/@vite</code>, <code>/@fs</code>, <code>/src/main.jsx</code>, <code>.js.map</code> (a 200 is a leak)</td>
+              <td><code>modern.yaml</code></td>
+            </tr>
+            <tr>
               <td>Traps</td>
               <td>Paths nobody honest should ever request</td>
               <td><code>canary.yaml</code></td>
@@ -134,7 +139,7 @@
               <td><code>web.canary.fake_archive</code></td>
             </tr>
             <tr>
-              <td>A 404/403 at <code>/.well-known/siem-canary</code> or <code>/__canary__/siem</code></td>
+              <td>A 404/403 at <code>/.well-known/siem-canary</code>, <code>/__canary__/siem</code>, or <code>/api/public/__siem-canary__</code></td>
               <td><code>web.canary.well_known</code></td>
             </tr>
           </tbody>

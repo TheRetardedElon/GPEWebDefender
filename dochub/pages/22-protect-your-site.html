@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>22 · Protect your site — GPEWebDefender</title>
+  <link rel="stylesheet" href="../css/dochub.css" />
+</head>
+<body data-base="..">
+  <button type="button" class="nav-toggle">Menu</button>
+  <div class="shell">
+    <nav class="side" id="dochub-nav"></nav>
+    <main class="main">
+      <header class="hero">
+        <h1>22 · Protect your site</h1>
+        <p class="lead">
+          One checklist. ACMECo (a fake shop) wants to see scanners, leaked
+          source, canaries, login spray, and the attacks only the app can see.
+          Nothing here is a real company or a real host.
+        </p>
+        <div class="meta-row">
+          <span class="pill live">Added 2026-08-17</span>
+          <span class="pill">Two planes</span>
+        </div>
+      </header>
+
+      <nav class="jump-nav">
+        <a href="#get">What you get for free</a>
+        <a href="#plant">Plant canaries</a>
+        <a href="#dev">Do not ship a dev server</a>
+        <a href="#app">Tell the app to postcard</a>
+        <a href="#look">Where to look</a>
+        <a href="#contain">Contain</a>
+        <a href="#check">Friday checklist</a>
+      </nav>
+
+      <section class="block" id="get">
+        <h2>What you get with only an access log</h2>
+        <p>
+          Tail nginx / Caddy / Apache (ch. <a href="03-install-and-run.html">03</a>).
+          No app code required. The monitor already matches:
+        </p>
+        <table>
+          <thead><tr><th>They request</th><th>You see</th></tr></thead>
+          <tbody>
+            <tr><td><code>/.env</code>, <code>/.git/config</code>, keys, <code>package.json</code></td><td>Recon. A <strong>200</strong> on those is critical — the file was served.</td></tr>
+            <tr><td><code>/@vite/client</code>, <code>/@fs/</code>, <code>/src/main.jsx</code>, <code>vite.config.js</code></td><td>Front-end <em>dev server</em> on a product host. A 200 is critical. Production must serve a built bundle, not <code>vite</code> / webpack-dev-server.</td></tr>
+            <tr><td><code>app.js.map</code> (and other <code>.js.map</code>)</td><td>Source-map hunt. A 200 means they can read your original source.</td></tr>
+            <tr><td>SQLi / XSS / traversal / Log4Shell in the URL</td><td>Classic web rules. Not POST bodies.</td></tr>
+            <tr><td>25× 404, 15× 401/403, login POST hammering</td><td>Storm / brute. Live + Insight.</td></tr>
+            <tr><td>sshd / sudo (agent <code>--journal</code>)</td><td>Reports → Auth · Linux</td></tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>Quiet static is on purpose</strong>
+          A 200 for <code>/assets/app.css</code> is thrown away. A 200 for <code>/assets/app.js.map</code>
+          or <code>/@vite/client</code> is <em>not</em>. Do not “fix” disk by logging less of those.
+        </div>
+      </section>
+
+      <section class="block" id="plant">
+        <h2>Plant canaries (five minutes)</h2>
+        <p>A path no honest user ever opens. Return 404 or 403. Do not link it from the UI.</p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.85rem;"><code># any one of these is enough
+/.well-known/siem-canary
+/__canary__/siem
+/api/public/__siem-canary__
+/api/public/__canary__/siem</code></pre>
+        <p>
+          Optional: <code>Disallow</code> it in <code>robots.txt</code> — scanners read that file.
+          The access-log agent fires <code>web.canary.well_known</code> (critical) on the first GET.
+          If the app can POST, also send <code>reason=canary_hit</code>. Both is fine.
+        </p>
+      </section>
+
+      <section class="block" id="dev">
+        <h2>Do not ship a front-end dev server</h2>
+        <p>
+          If a product hostname answers <code>GET /@vite/client</code> or serves
+          <code>/src/main.jsx</code>, anyone can read your client source, comments, and
+          sometimes secrets you thought were “build-only.” Serve a production build
+          (<code>vite preview</code>, nginx static, etc.). After that, those alerts should stay at zero.
+          If one comes back, someone put the dev server on the public host again.
+        </p>
+      </section>
+
+      <section class="block" id="app">
+        <h2>What only the app can tell you</h2>
+        <p>
+          Access logs cannot see a failed password in a POST body, a bad webhook HMAC,
+          or “user A opened user B’s invoice.” The app POSTs one JSON event.
+          Same ingest token. Fire-and-forget. Never wait on the monitor. Never send secrets.
+          Full field list: <a href="19-hook-your-app.html">19</a>.
+        </p>
+        <pre style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:auto;font-family:var(--mono);font-size:0.82rem;"><code>POST /api/ingest
+Authorization: Bearer SECRET
+Content-Type: application/json
+X-SIEM-Source: acme-app
+
+{ "kind": "secprobe", "src_ip": "203.0.113.9", "reason": "idor",
+  "path": "/invoices/999", "status": 403, "user": "alice", "outcome": "fail" }</code></pre>
+        <table>
+          <thead><tr><th>When this happens in <em>your</em> app</th><th>Send <code>reason</code></th></tr></thead>
+          <tbody>
+            <tr><td>Someone hit a planted decoy</td><td><code>canary_hit</code></td></tr>
+            <tr><td>URL had <code>../</code>, <code>.env</code>, <code>/@vite</code>, admin junk</td><td><code>path_probe</code></td></tr>
+            <tr><td>401/403 on an admin / export / privileged route</td><td><code>sensitive_deny</code></td></tr>
+            <tr><td>Webhook signature failed</td><td><code>webhook_reject</code></td></tr>
+            <tr><td>Login 429</td><td><code>auth_rate_limit</code> (and <code>kind=applogin</code> for the fail itself)</td></tr>
+            <tr><td>Public route 429 (feed, search, not login)</td><td><code>rate_limit</code></td></tr>
+            <tr><td>One IP guessed lots of public IDs / slugs</td><td><code>enum_burst</code></td></tr>
+            <tr><td>A feature said no because there was no session</td><td><code>app_deny</code></td></tr>
+            <tr><td>Score / leaderboard cheat or flood (you already decided)</td><td><code>score_abuse</code></td></tr>
+            <tr><td>Registration spray</td><td><code>signup_abuse</code></td></tr>
+            <tr><td>User A tried to read user B’s record</td><td><code>idor</code></td></tr>
+            <tr><td>Tried to become admin</td><td><code>priv_esc</code></td></tr>
+            <tr><td>Missing / stolen / replayed API key</td><td><code>key_replay</code></td></tr>
+            <tr><td>You blocked a fetch to a private IP</td><td><code>ssrf_out</code></td></tr>
+            <tr><td>Hostile upload</td><td><code>upload_abuse</code></td></tr>
+            <tr><td>Price / qty / order tamper</td><td><code>logic_deny</code></td></tr>
+            <tr><td>Tried to skip 2FA</td><td><code>stepup_bypass</code></td></tr>
+          </tbody>
+        </table>
+        <p class="hint">
+          If you cannot detect IDOR yet, do not send <code>idor</code>. The monitor cannot invent it from nginx.
+          Aliases exist (<code>cross_tenant</code> → <code>idor</code>, <code>arcade_deny</code> → <code>app_deny</code>)
+          so an existing app does not have to rename overnight.
+        </p>
+      </section>
+
+      <section class="block" id="look">
+        <h2>Where it shows up</h2>
+        <table>
+          <thead><tr><th>Surface</th><th>For</th></tr></thead>
+          <tbody>
+            <tr><td>Live → <strong>Probes</strong></td><td>Canaries, IDOR, key replay, score abuse, as they happen. Map shot on each alert.</td></tr>
+            <tr><td>Live → Web / Linux / App / Tenants</td><td>The other planes. Use these when one kind is burying another.</td></tr>
+            <tr><td>Reports → Insight</td><td>Volume, MITRE, hosts, countries. Click a bar to Search.</td></tr>
+            <tr><td>Reports → Probes</td><td>The workbook for <code>kind=secprobe</code>. Reason, path, IP.</td></tr>
+            <tr><td>Reports → Auth · *</td><td>Web 401/403, sshd, app logins, tenant logins.</td></tr>
+            <tr><td>Reports → Blocklist</td><td>Who you banned, which host, time left, whether the sensor applied it.</td></tr>
+            <tr><td>Inspect card</td><td>Kind-aware: Linux shows user/result; a probe shows reason + path — not a fake HTTP dump.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="contain">
+        <h2>Contain (optional)</h2>
+        <p>
+          Pair the host (ch. <a href="20-pair-and-block.html">20</a>), then Block from an alert card.
+          Manual only. Viewer and the ingest token cannot. Public IPs only.
+          Status (ch. <a href="21-host-status.html">21</a>) is a separate click when you want load / disk.
+        </p>
+      </section>
+
+      <section class="block" id="check">
+        <h2>Friday checklist</h2>
+        <ol>
+          <li>Manager + first admin. Agent on each box that has an access log. <code>--journal</code> if you care about SSH.</li>
+          <li>Settings: name, map pin, one row per agent <code>--name</code>.</li>
+          <li>Hit <code>/.env</code> from your laptop (expect 404). Confirm a recon alert. That proves plane 1.</li>
+          <li>Plant a canary. Hit it once. Confirm critical. That proves traps.</li>
+          <li>Confirm <code>GET /@vite/client</code> on the public host is <strong>not</strong> 200.</li>
+          <li>App POST for login fails → Reports → Auth · App. Then add IDOR / webhook / key reasons as you can detect them.</li>
+          <li>Optional: pair + Block. Optional: Status → Check.</li>
+        </ol>
+        <div class="callout info">
+          <strong>No inventory in this product</strong>
+          Hosts, tokens, pins, and canary paths you invent are yours.
+          The public tree has none of a real deployment’s names or secrets.
+        </div>
+      </section>
+
+      <footer class="foot">GPEWebDefender DocHub · 22 · previous: <a href="21-host-status.html">21 · Host status</a></footer>
+    </main>
+  </div>
+  <script src="../js/nav.js"></script>
+  <script src="../js/dochub.js"></script>
+</body>
+</html>

@@ -48,8 +48,12 @@ CREATE INDEX IF NOT EXISTS lf_lookup ON login_fails(username, ip, ts_ms);
 }
 
 func (s *Store) UserCount() int {
+	if n := s.userCount.Load(); n >= 0 {
+		return int(n)
+	}
 	var n int
 	_ = s.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&n)
+	s.userCount.Store(int64(n))
 	return n
 }
 
@@ -78,6 +82,7 @@ func (s *Store) CreateUser(username, password, role string) (User, error) {
 		return User{}, err
 	}
 	id, _ := res.LastInsertId()
+	s.userCount.Add(1)
 	return User{ID: id, Username: username, Role: role, Created: time.UnixMilli(now).UTC()}, nil
 }
 
@@ -190,6 +195,9 @@ func (s *Store) DeleteUser(id int64) error {
 	}
 	_, _ = s.db.Exec(`DELETE FROM sessions WHERE user_id = ?`, id)
 	_, err = s.db.Exec(`DELETE FROM users WHERE id = ?`, id)
+	if err == nil {
+		s.userCount.Add(-1)
+	}
 	return err
 }
 

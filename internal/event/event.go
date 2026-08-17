@@ -96,12 +96,18 @@ func NormalizeReason(s string) string {
 		return "sensitive_deny"
 	case "webhook_reject", "webhook_fail", "webhook-reject":
 		return "webhook_reject"
-	case "auth_rate_limit", "ratelimit", "rate_limit", "auth-rate-limit":
+	case "auth_rate_limit", "auth-rate-limit":
 		return "auth_rate_limit"
+	case "rate_limit", "ratelimit", "public_429", "api_rate_limit":
+		return "rate_limit"
 	case "enum_burst", "enum-burst":
 		return "enum_burst"
 	case "app_deny", "feature_deny", "app-deny":
 		return "app_deny"
+	case "score_abuse", "arcade_score_abuse", "score_spam", "score_flood", "leaderboard_abuse":
+		return "score_abuse"
+	case "signup_abuse", "signup_spam", "register_abuse":
+		return "signup_abuse"
 	case "idor", "id_or", "cross_tenant":
 		return "idor"
 	case "priv_esc", "privesc", "privilege_escalation":
@@ -136,7 +142,7 @@ func QuietStatic(ev Event) bool {
 		return false
 	}
 	blob := strings.ToLower(ev.Path + "?" + ev.Query + " " + ev.Decoded)
-	for _, bad := range []string{"..", "%2e%2e", "union", "<script", "wp-config", ".env", ".git", "passwd"} {
+	for _, bad := range []string{"..", "%2e%2e", "union", "<script", "wp-config", ".env", ".git", "passwd", "/@vite", "/@fs/", "vite.config"} {
 		if strings.Contains(blob, bad) {
 			return false
 		}
@@ -148,7 +154,7 @@ func QuietStatic(ev Event) bool {
 	}
 	ext := p[dot:]
 	switch ext {
-	case ".css", ".js", ".mjs", ".map", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico",
+	case ".css", ".js", ".mjs", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico",
 		".woff", ".woff2", ".ttf", ".eot", ".otf", ".mp4", ".webm", ".mp3",
 		".txt", ".xml", ".json" /* only as leaf static, not APIs — json often is API; skip */:
 		if ext == ".json" || ext == ".xml" || ext == ".txt" {

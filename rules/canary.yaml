@@ -37,4 +37,4 @@ rules:
     mitre: [T1595.002]
     tags: [canary]
     fields: [path]
-    pattern: '(?i)^/\.well-known/siem-canary(/|$)|^/__canary__/siem(/|$)|^/__siem__/canary(/|$)'
+    pattern: '(?i)^/\.well-known/siem-canary(/|$)|^/__canary__/siem(/|$)|^/__siem__/canary(/|$)|^/api/public/__siem-canary__(/|$)|^/api/public/__canary__/siem(/|$)'

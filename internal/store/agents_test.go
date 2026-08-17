@@ -93,6 +93,36 @@ func TestBlockListRemembersWhy(t *testing.T) {
 	}
 }
 
+func TestBlockListDoesNotDeadlock(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "b.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	_ = st.SetPairPhrase("correct-horse-phrase")
+	code, _, _ := st.MintPairCode("ops")
+	a, _, err := st.PairAgent("edge", "correct-horse-phrase", code, "", "", "", "198.51.100.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = st.ApproveAgent(a.ID, "ops")
+	if _, err := st.EnqueueCommandWhy(a.ID, "ban", "198.51.100.88", "1h", "ops", BanWhy{
+		Title: "SSH failed login as root", Category: "hostauth", AlertNum: 1, Scope: "this",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := st.BlockList(); done <- err }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("BlockList deadlocked on nested SQLite query")
+	}
+}
+
 func TestCommandExpires(t *testing.T) {
 	st, err := Open(filepath.Join(t.TempDir(), "b.db"))
 	if err != nil {

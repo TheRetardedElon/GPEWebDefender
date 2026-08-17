@@ -62,7 +62,7 @@ func (s *Server) clearSessionCookie(w http.ResponseWriter) {
 
 func openPath(p string) bool {
 	switch p {
-	case "/api/health", "/api/login", "/api/setup", "/api/auth-status", "/login", "/login.html":
+	case "/", "/index.html", "/api/health", "/api/login", "/api/setup", "/api/auth-status", "/login", "/login.html":
 		return true
 	case "/app.css", "/app.js", "/map-basemap.jpg":
 		return true
@@ -77,6 +77,11 @@ func (s *Server) auth(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Cache-Control", "no-store")
+
+		if openPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
 			if u, err := s.Store.SessionUser(c.Value); err == nil {
@@ -113,11 +118,6 @@ func (s *Server) auth(next http.Handler) http.Handler {
 				return
 			}
 			r = r.WithContext(context.WithValue(r.Context(), agentCtx, ag))
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if openPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}

@@ -161,6 +161,7 @@ Examples live in [`deploy/`](deploy/).
 7. Optional app denials the access log cannot see: POST JSON to `/api/ingest`. Never send passwords. DocHub **19**.
 8. Optional **block from the dashboard**: Settings → Paired hosts → invent a phrase → mint a code → on the sensor `gpewebdefender pair --url … --name web-1 --code … --block fail2ban` → Approve. DocHub **20**. Viewer and the ingest token cannot ban. Not automatic.
 9. Optional **Status**: open Status and click **Check** on the manager (works immediately). Pair a host (same as step 8) to Check that box for load / memory / disk. Nothing is polled until you click. Agents need 0.9.25+. DocHub **21**.
+10. **Protect the site** (DocHub **22**): plant `/.well-known/siem-canary`, confirm `GET /@vite/client` is not 200 on the public host, POST `kind=secprobe` for IDOR / webhooks / score abuse the access log cannot see. Never send passwords.
 
 If the UI is empty: you are not in demo, and no `--tail` / agent has sent a line yet. `journalctl -u gpewebdefender -n 50`.
 
@@ -176,7 +177,8 @@ Anything that shows up in an access log:
 - Known scanners (sqlmap, nuclei, nikto, ffuf, …)
 - 404 storms, 401/403 hammering, login brute force, request floods
 - Optional: sshd / sudo via `--journal` or `auth.log`
-- Optional: your app POSTs `kind=applogin` / `tenantlogin` / `secprobe`
+- Front-end leak: `/@vite`, `/@fs`, `/src/main.jsx`, served `.js.map` (a 200 is a leak)
+- Optional: your app POSTs `kind=applogin` / `tenantlogin` / `secprobe` (IDOR, canary, webhook, score abuse, …). DocHub **19** / **22**.
 
 It **cannot** see POST bodies unless you log them (you usually should not).
 

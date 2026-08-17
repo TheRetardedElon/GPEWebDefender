@@ -15,13 +15,13 @@
       <header class="hero">
         <h1>07 · Rule catalog</h1>
         <p class="lead">
-          Built-in set across <code>rules/web.yaml</code>, <code>modern.yaml</code>,
-          <code>snoop.yaml</code>, and <code>canary.yaml</code> — <strong>41 rules</strong>.
+          Built-in set across <code>web</code>, <code>modern</code>, <code>snoop</code>,
+          <code>canary</code>, <code>auth</code>, and <code>secprobe</code> — <strong>74 rules</strong>.
           Source of truth is the YAML; this table is the readable twin.
         </p>
         <div class="meta-row">
-          <span class="pill live">Reviewed 2026-08-14</span>
-          <span class="pill">41 rules</span>
+          <span class="pill live">Reviewed 2026-08-17</span>
+          <span class="pill">74 rules</span>
         </div>
       </header>
 
@@ -39,6 +39,8 @@
         <a href="#modern">Modern</a>
         <a href="#snoop">Snoop</a>
         <a href="#canary">Canary</a>
+        <a href="#auth">Auth</a>
+        <a href="#sec">App probes</a>
       </nav>
 
       <section class="block" id="inj">
@@ -128,6 +130,10 @@
             <tr><td><code>web.recon.apidocs</code></td><td>Swagger / OpenAPI</td><td>medium</td></tr>
             <tr><td><code>web.recon.graphql</code></td><td>GraphQL / introspection</td><td>medium</td></tr>
             <tr><td><code>web.recon.debugbar</code></td><td>Debug toolbar / actuator</td><td>medium</td></tr>
+            <tr><td><code>web.recon.devserver</code></td><td>Front-end dev server / source tree (<code>/@vite</code>, <code>/@fs</code>, <code>/src/main.jsx</code>)</td><td>high</td></tr>
+            <tr><td><code>web.secret.dev_served</code></td><td>Those paths returned 200 — source leak</td><td>critical</td></tr>
+            <tr><td><code>web.recon.sourcemap</code></td><td><code>.js.map</code> / <code>.css.map</code> probe</td><td>medium</td></tr>
+            <tr><td><code>web.secret.map_served</code></td><td>Source map was served (200)</td><td>high</td></tr>
             <tr><td><code>web.tamper.debug_param</code></td><td><code>?debug=true</code> / <code>?admin=1</code></td><td>medium</td></tr>
             <tr><td><code>web.bypass.normalize</code></td><td>Path-normalization bypass</td><td>high</td></tr>
             <tr><td><code>web.bypass.header_hint</code></td><td>Rewrite headers if logged</td><td>high</td></tr>
@@ -155,9 +161,55 @@
             <tr><td><code>web.canary.robots_trap</code></td><td>Trap path from robots.txt</td><td>critical</td></tr>
             <tr><td><code>web.canary.internal_sync</code></td><td>Fake internal API path</td><td>critical</td></tr>
             <tr><td><code>web.canary.fake_archive</code></td><td>Fake backup.zip / dump.sql</td><td>high</td></tr>
+            <tr><td><code>web.canary.well_known</code></td><td><code>/.well-known/siem-canary</code> and public <code>__siem-canary__</code> paths</td><td>critical</td></tr>
           </tbody>
         </table>
-        <p class="hint">How to plant them: <a href="14-snoop-and-canaries.html">14</a>.</p>
+        <p class="hint">How to plant them: <a href="14-snoop-and-canaries.html">14</a> and <a href="22-protect-your-site.html">22</a>.</p>
+      </section>
+
+      <section class="block" id="auth">
+        <h2>Auth (<code>auth.yaml</code>)</h2>
+        <table>
+          <thead><tr><th>id</th><th>Title</th><th>Sev</th></tr></thead>
+          <tbody>
+            <tr><td><code>linux.ssh.brute</code></td><td>SSH brute force (threshold)</td><td>high</td></tr>
+            <tr><td><code>linux.ssh.root</code></td><td>Failed SSH as root</td><td>high</td></tr>
+            <tr><td><code>linux.ssh.invalid</code></td><td>SSH invalid user</td><td>medium</td></tr>
+            <tr><td><code>linux.sudo.fail</code></td><td>sudo auth failure</td><td>medium</td></tr>
+            <tr><td><code>app.login.fail</code></td><td>Application login failure</td><td>low</td></tr>
+            <tr><td><code>app.login.brute</code></td><td>Application login brute</td><td>high</td></tr>
+            <tr><td><code>tenant.login.fail</code></td><td>Tenant / site-owner login failure</td><td>low</td></tr>
+            <tr><td><code>tenant.login.brute</code></td><td>Tenant login brute</td><td>high</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block" id="sec">
+        <h2>App probes (<code>secprobe.yaml</code>)</h2>
+        <p>These match <code>kind=secprobe</code> + <code>reason</code> from the application POST. Not access-log paths. How to send them: <a href="19-hook-your-app.html">19</a> / <a href="22-protect-your-site.html">22</a>.</p>
+        <table>
+          <thead><tr><th>id</th><th>reason</th><th>Sev</th></tr></thead>
+          <tbody>
+            <tr><td><code>sec.canary.hit</code></td><td><code>canary_hit</code></td><td>high</td></tr>
+            <tr><td><code>sec.path.probe</code></td><td><code>path_probe</code></td><td>medium</td></tr>
+            <tr><td><code>sec.authz.deny</code></td><td><code>sensitive_deny</code></td><td>medium</td></tr>
+            <tr><td><code>sec.webhook.fail</code></td><td><code>webhook_reject</code></td><td>medium</td></tr>
+            <tr><td><code>sec.auth.ratelimit</code></td><td><code>auth_rate_limit</code></td><td>medium</td></tr>
+            <tr><td><code>sec.rate.limit</code></td><td><code>rate_limit</code></td><td>low</td></tr>
+            <tr><td><code>sec.enum.burst</code></td><td><code>enum_burst</code></td><td>medium</td></tr>
+            <tr><td><code>sec.app.deny</code></td><td><code>app_deny</code></td><td>low</td></tr>
+            <tr><td><code>sec.score.abuse</code></td><td><code>score_abuse</code></td><td>medium</td></tr>
+            <tr><td><code>sec.signup.abuse</code></td><td><code>signup_abuse</code></td><td>medium</td></tr>
+            <tr><td><code>sec.idor</code></td><td><code>idor</code></td><td>high</td></tr>
+            <tr><td><code>sec.priv_esc</code></td><td><code>priv_esc</code></td><td>high</td></tr>
+            <tr><td><code>sec.key_replay</code></td><td><code>key_replay</code></td><td>high</td></tr>
+            <tr><td><code>sec.ssrf_out</code></td><td><code>ssrf_out</code></td><td>high</td></tr>
+            <tr><td><code>sec.upload_abuse</code></td><td><code>upload_abuse</code></td><td>high</td></tr>
+            <tr><td><code>sec.ws_abuse</code></td><td><code>ws_abuse</code></td><td>medium</td></tr>
+            <tr><td><code>sec.logic_deny</code></td><td><code>logic_deny</code></td><td>medium</td></tr>
+            <tr><td><code>sec.stepup_bypass</code></td><td><code>stepup_bypass</code></td><td>high</td></tr>
+          </tbody>
+        </table>
       </section>
 
       <footer class="foot">GPEWebDefender DocHub · 07 · next: <a href="08-ui-and-api.html">08 · UI &amp; API</a></footer>

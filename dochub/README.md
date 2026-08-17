@@ -9,7 +9,7 @@ Never put real hostnames, IPs, or secrets in these pages.
 
 **New here?** Open [pages/03-install-and-run.html](pages/03-install-and-run.html). Method A is the install script. Method B is every command typed out.
 
-## Chapters (00 → 21)
+## Chapters (00 → 22)
 
 Nav is generated only from `js/nav.js`.
 
@@ -20,7 +20,7 @@ Nav is generated only from `js/nav.js`.
 | **06–07** | Detection engine + rule catalog |
 | **08–10** | UI/API, agent, dedicated-box deploy |
 | **11–15** | Limits, roadmap, map, canaries, production edge |
-| **16–21** | Insight / reports, configure map, operator accounts, hook your app, pair & block, on-demand host status |
+| **16–22** | Insight / reports, configure, operators, hook your app, pair & block, host status, protect-your-site hunt |
 
 ## Local open
 

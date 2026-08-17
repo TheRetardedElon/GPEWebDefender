@@ -48,6 +48,48 @@ rules:
     fields: [path]
     pattern: '(?i)(/_debugbar|/debugbar|/__debug|/telescope|/horizon|/phpinfo|/actuator/(env|heapdump|health|beans|mappings))'
 
+  - id: web.recon.devserver
+    title: Front-end dev-server / source-tree probe
+    severity: high
+    category: recon
+    mitre: [T1595.003]
+    tags: [probe, leak]
+    skip_loopback: true
+    fields: [path]
+    pattern: '(?i)(/@vite(/|$)|/@fs(/|$)|/@id(/|$)|/@react-refresh|vite\.config\.(js|ts|mjs)|(^|/)src/main\.(jsx?|tsx?|vue)$)'
+
+  - id: web.secret.dev_served
+    title: Front-end source / dev-server path was served
+    severity: critical
+    category: canary
+    mitre: [T1552.001]
+    tags: [secret, leak]
+    skip_loopback: true
+    status: [200, 206]
+    fields: [path]
+    pattern: '(?i)(/@vite(/|$)|/@fs(/|$)|/@id(/|$)|/@react-refresh|vite\.config\.(js|ts|mjs)|(^|/)src/main\.(jsx?|tsx?|vue)$)'
+
+  - id: web.recon.sourcemap
+    title: JavaScript source-map probe
+    severity: medium
+    category: recon
+    mitre: [T1595.003]
+    tags: [probe]
+    skip_loopback: true
+    fields: [path]
+    pattern: '(?i)\.(js|css|mjs)\.map($|\?)'
+
+  - id: web.secret.map_served
+    title: JavaScript source map was served
+    severity: high
+    category: recon
+    mitre: [T1552.001]
+    tags: [leak]
+    skip_loopback: true
+    status: [200, 206]
+    fields: [path]
+    pattern: '(?i)\.(js|css|mjs)\.map($|\?)'
+
   - id: web.tamper.debug_param
     title: Debug / admin query-parameter tamper
     severity: medium

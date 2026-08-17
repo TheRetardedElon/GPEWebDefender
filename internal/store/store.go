@@ -16,9 +16,10 @@ import (
 )
 
 type Store struct {
-	db    *sql.DB
-	mu    sync.Mutex
-	start time.Time
+	db        *sql.DB
+	mu        sync.Mutex
+	start     time.Time
+	userCount atomic.Int64 // -1 until first count
 }
 
 func Open(path string) (*Store, error) {
@@ -29,10 +30,12 @@ func Open(path string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 	s := &Store{db: db, start: time.Now()}
+	s.userCount.Store(-1)
 	if err := s.migrate(); err != nil {
 		db.Close()
 		return nil, err
 	}
+	s.UserCount()
 	return s, nil
 }
 
@@ -168,7 +171,7 @@ func (s *Store) backfillAlertStory() {
 		WHEN category = 'hostauth' THEN 'hostauth'
 		WHEN category = 'applogin' THEN 'applogin'
 		WHEN category = 'tenant' THEN 'tenantlogin'
-		WHEN category IN ('canary','authz','secprobe','tamper') THEN 'secprobe'
+		WHEN category IN ('canary','authz','secprobe','tamper','bypass','ssrf') THEN 'secprobe'
 		WHEN upper(IFNULL(method,'')) IN ('SSH','SUDO') THEN 'hostauth'
 		WHEN upper(IFNULL(method,'')) = 'LOGIN' THEN 'applogin'
 		ELSE 'web'
@@ -211,7 +214,7 @@ func inferAlertKind(a event.Alert) string {
 		return event.KindAppLogin
 	case "tenant":
 		return event.KindTenantLogin
-	case "canary", "authz", "secprobe", "tamper":
+	case "canary", "authz", "secprobe", "tamper", "bypass", "ssrf":
 		return event.KindSecProbe
 	}
 	switch strings.ToUpper(a.Method) {
@@ -291,9 +294,9 @@ func planeSQL(plane string) string {
 	case "tenant", "tenantlogin":
 		return "category = 'tenant'"
 	case "probes", "secprobe":
-		return "category IN ('canary','authz','secprobe','tamper')"
+		return "(kind = 'secprobe' OR category IN ('canary','authz','secprobe','tamper','bypass','ssrf','dos'))"
 	case "web":
-		return "IFNULL(category,'') NOT IN ('hostauth','applogin','tenant')"
+		return "IFNULL(kind,'web') IN ('','web') AND IFNULL(category,'') NOT IN ('hostauth','applogin','tenant','canary','authz','secprobe','tamper','bypass')"
 	default:
 		return ""
 	}
